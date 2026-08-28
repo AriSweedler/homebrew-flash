@@ -80,7 +80,7 @@ it back to the drawing board — do not hand-fix the test machine.
       actually got created:
   ```sh
   ls -la ~/Library/Application\ Support/ | grep -i ruffle
-  find ~/Library/Application\ Support/rs.ruffle* -maxdepth 4 2>/dev/null
+  find ~/Library/Application\ Support/ruffle -maxdepth 4 2>/dev/null
   ls ~/Library/Saved\ Application\ State/ | grep -Ei 'ruffle|arisweedler'
   ls ~/Library/Preferences/ | grep -Ei 'ruffle|arisweedler'
   ```
@@ -124,7 +124,7 @@ brew upgrade   arisweedler/flash/bubble-trouble    # version was bumped
       `brew uninstall --zap arisweedler/flash/bubble-trouble`
   - App gone AND the game's zap paths (saved state, its SharedObjects dir) gone.
 - [ ] `brew uninstall --zap arisweedler/flash/ruffle`
-  - `/Applications/Ruffle.app` gone; `~/Library/Application Support/rs.ruffle*` gone;
+  - `/Applications/Ruffle.app` gone; `~/Library/Application Support/ruffle` gone (dirs-crate path);
     ruffle prefs/caches/saved-state gone (per step 6 recordings).
 - [ ] `brew autoremove` → removes `ari-flash-launcher` (it was only a dependency).
       If it does not, record it; README must document the extra
