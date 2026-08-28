@@ -9,7 +9,7 @@
 # Then follow the ADD-A-GAME checklist in README.md to tag and cut the release.
 cask "bubble-trouble" do # (1)
   version "1.0.0" # (2)
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE (3)
+  sha256 "933c774e486adcbed437add9cb551baaa41c0f688248310e78d1553cf2d521a3"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/flash-bundler, launcher/launcher, games/<slug>/{game.swf,icon.png}.
