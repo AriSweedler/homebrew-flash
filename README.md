@@ -8,8 +8,13 @@ launch any installed game from the terminal.
 
 ```sh
 brew tap arisweedler/flash
-brew install bubble-trouble
+brew trust --tap arisweedler/flash
+brew install arisweedler/flash/bubble-trouble
 ```
+
+The `brew trust` step is required: Homebrew refuses to load formulae and casks
+from non-official taps until you trust them (stored in `~/.homebrew/trust.json`,
+or `$XDG_CONFIG_HOME/homebrew/trust.json`).
 
 That one install pulls everything: the game, Ari's distro of Ruffle, and the
 `ari-flash-launcher` CLI. Then either:
@@ -70,11 +75,11 @@ compiling from source, no DMG to click through.
 Everything is removable, including saves:
 
 ```sh
-brew uninstall bubble-trouble          # removes the .app
-brew uninstall --zap bubble-trouble    # + that game's Ruffle save data
-brew uninstall --zap ruffle            # + Ruffle and ALL games' saves/config
-brew autoremove                        # removes ari-flash-launcher once
-                                       # nothing depends on it
+brew uninstall arisweedler/flash/bubble-trouble        # removes the .app
+brew uninstall --zap arisweedler/flash/bubble-trouble  # + that game's Ruffle save data
+brew uninstall --zap arisweedler/flash/ruffle          # + Ruffle and ALL games' saves/config
+brew autoremove                                        # removes ari-flash-launcher once
+                                                       # nothing depends on it
 ```
 
 Zapping `ruffle` deletes `~/Library/Application Support/ruffle`, which holds

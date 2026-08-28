@@ -24,10 +24,13 @@ it back to the drawing board — do not hand-fix the test machine.
 - [ ] `brew tap arisweedler/flash`
   - Success: exits 0; `brew tap` lists `arisweedler/flash`.
   - Failure capture: full output; `brew tap-info arisweedler/flash`.
+- [ ] `brew trust --tap arisweedler/flash`
+  - Required: Homebrew refuses to load formulae/casks from untrusted
+    non-official taps. Success: exits 0; `brew trust --json=v1` lists the tap.
 
 ## 2. Install a game (the headline test)
 
-- [ ] `brew install bubble-trouble`
+- [ ] `brew install arisweedler/flash/bubble-trouble`
   - Success, all of:
     - exits 0
     - installed the dependency chain automatically: ruffle cask + ari-flash-launcher
@@ -37,7 +40,7 @@ it back to the drawing board — do not hand-fix the test machine.
     - `/Applications/Ruffle.app` exists
     - `/Applications/Bubble Trouble.app` exists
     - No password prompts beyond brew's normal behavior, no Xcode/CLT demands.
-  - Failure capture: full install log (`brew install bubble-trouble 2>&1 | tee install.log`).
+  - Failure capture: full install log (`brew install arisweedler/flash/bubble-trouble 2>&1 | tee install.log`).
 
 ## 3. Launch path A — the .app (double-click UX)
 
@@ -86,18 +89,41 @@ it back to the drawing board — do not hand-fix the test machine.
 ## 7. Upgrade path
 
 Only when a second version/tag exists:
-- [ ] `brew upgrade bubble-trouble` → rebuilds and replaces the app; relaunch works; no
-      duplicate apps; `brew list --cask --versions bubble-trouble` shows the new version.
+- [ ] `brew upgrade arisweedler/flash/bubble-trouble` → rebuilds and replaces the app;
+      relaunch works; no duplicate apps;
+      `brew list --cask --versions bubble-trouble` shows the new version.
+
+## 7b. Re-testing after a fix (the iterate loop)
+
+When the dev machine pushes a fix to the tap, pick up the changes on the test
+machine with:
+
+```sh
+brew update                                        # git-pulls the tap clone
+brew reinstall arisweedler/flash/bubble-trouble    # cask/script changed, same version
+brew upgrade   arisweedler/flash/bubble-trouble    # version was bumped
+```
+
+- `brew update` is what refreshes third-party taps (they are plain git clones
+  under `$(brew --prefix)/Library/Taps/arisweedler/homebrew-flash`); nothing
+  reloads automatically without it.
+- Release assets are IMMUTABLE by policy: a fix to anything inside a tarball
+  (bundler, launcher, swf, icon) means a NEW tag + version bump + cut-release,
+  never re-uploading a changed asset to the same tag (the pinned sha256 would
+  mismatch). Cask-only or formula-only fixes (zap paths, plist of the cask,
+  README) need no new asset — just push, `brew update`, `brew reinstall`.
+- If you `brew untap` during cleanup, the trust entry is invalidated — re-run
+  `brew trust --tap arisweedler/flash` after re-tapping.
 
 ## 8. Uninstall + zap (must leave the machine spotless)
 
-- [ ] `brew uninstall bubble-trouble`
+- [ ] `brew uninstall arisweedler/flash/bubble-trouble`
   - `/Applications/Bubble Trouble.app` gone; Ruffle.app still present.
-- [ ] `brew uninstall --zap bubble-trouble` is a no-op now (already uninstalled) — instead
-      reinstall once (`brew install bubble-trouble`) and then:
-      `brew uninstall --zap bubble-trouble`
+- [ ] `brew uninstall --zap arisweedler/flash/bubble-trouble` is a no-op now (already uninstalled) — instead
+      reinstall once (`brew install arisweedler/flash/bubble-trouble`) and then:
+      `brew uninstall --zap arisweedler/flash/bubble-trouble`
   - App gone AND the game's zap paths (saved state, its SharedObjects dir) gone.
-- [ ] `brew uninstall --zap ruffle`
+- [ ] `brew uninstall --zap arisweedler/flash/ruffle`
   - `/Applications/Ruffle.app` gone; `~/Library/Application Support/rs.ruffle*` gone;
     ruffle prefs/caches/saved-state gone (per step 6 recordings).
 - [ ] `brew autoremove` → removes `ari-flash-launcher` (it was only a dependency).
