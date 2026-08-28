@@ -1,0 +1,83 @@
+#!/bin/bash
+# cut-release — build a FLAT release-asset tarball from a git tag, upload it
+# as a GitHub release, and print the sha256 line to paste into the cask or
+# formula.
+#
+# Usage:
+#   scripts/cut-release <tag> <path>...
+#
+# Examples:
+#   scripts/cut-release bubble-trouble-v1.0.0 bin/flash-bundler launcher/launcher games/bubble-trouble
+#   scripts/cut-release tools-v1.0.0 bin launcher
+#
+# Asset naming contract (must match the cask/formula urls):
+#   <slug>-v<ver>  -> <slug>-<ver>.tar.gz
+#   tools-v<ver>   -> ari-flash-tools-<ver>.tar.gz
+#
+# The tarball is FLAT (git archive, no --prefix): casks reference
+# "#{staged_path}/bin/flash-bundler" etc., so a top-level directory would
+# break every install. Auto-generated /archive/ URLs are never used because
+# GitHub does not guarantee their checksums stay stable.
+#
+# Requires personal-GitHub auth: `env -u GITHUB_TOKEN gh auth login` as
+# AriSweedler first (GITHUB_TOKEN pins gh to the work account, so it is
+# stripped for every gh call here).
+set -euo pipefail
+
+usage() {
+  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  exit 2
+}
+
+[[ $# -ge 2 ]] || usage
+tag="$1"
+shift
+
+case "$tag" in
+tools-v*) asset="ari-flash-tools-${tag#tools-v}.tar.gz" ;;
+*-v*) asset="${tag%-v*}-${tag##*-v}.tar.gz" ;;
+*)
+  echo "error: tag '$tag' does not match <slug>-v<version> or tools-v<version>" >&2
+  exit 1
+  ;;
+esac
+
+cd "$(git rev-parse --show-toplevel)"
+
+if ! git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+  echo "error: tag '$tag' does not exist. Create it first:  git tag $tag && git push origin $tag" >&2
+  exit 1
+fi
+
+workdir="$(mktemp -d "${TMPDIR:-/tmp}/cut-release.XXXXXX")"
+out="$workdir/$asset"
+
+git archive --format=tar.gz -o "$out" "$tag" -- "$@"
+
+# Verify flatness: every entry's first path component must be one of the
+# requested paths' first components — never a synthetic <repo>-<tag>/ prefix.
+want="$(printf '%s\n' "$@" | cut -d/ -f1 | sort -u)"
+got="$(tar -tzf "$out" | cut -d/ -f1 | sort -u)"
+if [[ "$got" != "$want" ]]; then
+  echo "error: archive is not flat / contents unexpected." >&2
+  echo "wanted top-level entries:" >&2
+  printf '  %s\n' $want >&2
+  echo "got:" >&2
+  printf '  %s\n' $got >&2
+  exit 1
+fi
+
+echo "--- $asset contents ---"
+tar -tzf "$out"
+
+sha="$(shasum -a 256 "$out" | awk '{print $1}')"
+
+env -u GITHUB_TOKEN gh release create "$tag" "$out" \
+  --verify-tag \
+  --title "$tag" \
+  --notes "Release asset for the arisweedler/flash tap. Flat tarball; see README.md."
+
+echo
+echo "Update the cask/formula for $tag: replace the zero-hash placeholder line"
+echo "(marked # REPLACE_AT_RELEASE) with:"
+echo "  sha256 \"$sha\""

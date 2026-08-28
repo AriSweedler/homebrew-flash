@@ -1,0 +1,109 @@
+#!/bin/bash
+# ari-flash-launcher — launch brew-installed Flash games in Ruffle.
+#
+# The installed .apps ARE the registry: games are discovered by scanning
+# application dirs for bundles whose CFBundleIdentifier starts with
+# com.arisweedler.flash. (deterministic plutil scan; mdfind is not used because
+# Spotlight lags fresh installs and can be disabled).
+set -euo pipefail
+
+ID_PREFIX="com.arisweedler.flash."
+APP_DIRS="${ARI_FLASH_APP_DIRS:-/Applications:${HOME}/Applications}"
+
+usage() {
+  cat <<EOF
+Usage: ari-flash-launcher [<game>|<path/to.swf>|--list|--help]
+
+  <game>         Slug or display name of an installed game (case-insensitive),
+                 e.g. 'bubble-trouble' or 'Bubble Trouble'. Opens its .app.
+  <path/to.swf>  Open an arbitrary SWF file directly in Ruffle.
+  --list         List installed games (default when run with no arguments).
+  --help         This help.
+
+Games are discovered by scanning for apps with a ${ID_PREFIX}* bundle
+identifier in: /Applications and ~/Applications.
+
+Environment:
+  ARI_FLASH_APP_DIRS   Colon-separated dirs to scan instead of the default.
+  ARI_FLASH_DRY_RUN    If set, print the 'open' command instead of running it.
+EOF
+}
+
+# Print one line per installed game: "<slug>\t<display name>\t<app path>"
+scan_games() {
+  local dir app plist id name
+  local IFS=':'
+  for dir in $APP_DIRS; do
+    [ -d "$dir" ] || continue
+    for app in "$dir"/*.app; do
+      plist="$app/Contents/Info.plist"
+      [ -f "$plist" ] || continue
+      id=$(plutil -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null) || continue
+      case "$id" in
+        "$ID_PREFIX"*) ;;
+        *) continue ;;
+      esac
+      name=$(plutil -extract CFBundleName raw -o - "$plist" 2>/dev/null) \
+        || name=$(basename "$app" .app)
+      printf '%s\t%s\t%s\n' "${id#"$ID_PREFIX"}" "$name" "$app"
+    done
+  done
+}
+
+list_games() {
+  local games
+  games=$(scan_games)
+  if [ -z "$games" ]; then
+    echo "No flash games installed. Install one with e.g.:"
+    echo "  brew install arisweedler/flash/bubble-trouble"
+    return
+  fi
+  echo "Installed flash games (slug — name):"
+  printf '%s\n' "$games" | while IFS=$'\t' read -r slug name _; do
+    printf '  %s — %s\n' "$slug" "$name"
+  done
+}
+
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+do_open() {
+  if [ -n "${ARI_FLASH_DRY_RUN:-}" ]; then
+    printf 'DRY-RUN: open'; printf ' %q' "$@"; printf '\n'
+  else
+    open "$@"
+  fi
+}
+
+main() {
+  local arg="${1:-}"
+  case "$arg" in
+    ""|--list) list_games; exit 0 ;;
+    --help|-h) usage; exit 0 ;;
+  esac
+
+  # A real file → hand it to Ruffle directly.
+  if [ -f "$arg" ]; then
+    local abs
+    abs="$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")"
+    do_open -a Ruffle --args "$abs"
+    exit 0
+  fi
+
+  # Otherwise match an installed game by slug or display name.
+  local want slug name app
+  want=$(lower "$arg")
+  while IFS=$'\t' read -r slug name app; do
+    if [ "$(lower "$slug")" = "$want" ] || [ "$(lower "$name")" = "$want" ]; then
+      do_open "$app"
+      exit 0
+    fi
+  done <<EOF
+$(scan_games)
+EOF
+
+  echo "error: no installed game matches '$arg'" >&2
+  list_games >&2
+  exit 1
+}
+
+main "$@"

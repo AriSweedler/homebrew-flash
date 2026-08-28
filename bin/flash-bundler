@@ -1,0 +1,200 @@
+#!/bin/bash
+# flash-bundler — turn a swf + image into a signed, double-clickable macOS .app
+# that plays the game in Ruffle via the ari-flash launcher stub.
+#
+# Must stay bash: the iconset loop silently misbehaves under zsh (no word
+# splitting), and brew casks invoke this as `/bin/bash flash-bundler ...`.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: flash-bundler --name <Display Name> --id <bundle-id> --swf <path>
+                     --icon <path> --version <semver> --out <dir>
+                     [--launcher-bin <path>] [--launcher-src <path>]
+                     [--library-swf <abs path>]
+
+Builds "<out>/<Display Name>.app" containing the swf, a generated .icns, the
+launcher stub, and an ad-hoc code signature.
+
+  --name          Display name of the game ("Bubble Trouble")
+  --id            Bundle identifier (com.arisweedler.flash.bubble-trouble)
+  --swf           Path to the game .swf
+  --icon          Icon image: .icns used as-is, anything sips reads is
+                  converted (1024x1024 source recommended)
+  --version       App version (CFBundleShortVersionString / CFBundleVersion)
+  --out           Directory to create the .app in
+  --launcher-bin  Prebuilt launcher Mach-O to embed
+                  (default: <bundler dir>/../launcher/launcher)
+  --launcher-src  Compile this launcher.m instead (universal; needs a compiler
+                  — authoring machines only, never end users)
+  --library-swf   Install the swf at this ABSOLUTE path instead of embedding,
+                  and point the app there via Info.plist FlashGameSWF
+EOF
+}
+
+log() { printf 'flash-bundler: %s\n' "$*" >&2; }
+die() { log "ERROR: $*"; exit 1; }
+
+# realpath(1) is not on every macOS; resolve symlinks portably so the default
+# launcher path works when brew symlinks us into <prefix>/bin.
+resolve() {
+  local target=$1 dir
+  while [ -L "$target" ]; do
+    dir=$(cd "$(dirname "$target")" && pwd)
+    target=$(readlink "$target")
+    [[ $target = /* ]] || target="$dir/$target"
+  done
+  printf '%s/%s\n' "$(cd "$(dirname "$target")" && pwd)" "$(basename "$target")"
+}
+
+name="" bundle_id="" swf="" icon="" version="" out=""
+launcher_bin="" launcher_src="" library_swf=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --name)         name=${2:?--name needs a value}; shift 2 ;;
+    --id)           bundle_id=${2:?--id needs a value}; shift 2 ;;
+    --swf)          swf=${2:?--swf needs a value}; shift 2 ;;
+    --icon)         icon=${2:?--icon needs a value}; shift 2 ;;
+    --version)      version=${2:?--version needs a value}; shift 2 ;;
+    --out)          out=${2:?--out needs a value}; shift 2 ;;
+    --launcher-bin) launcher_bin=${2:?--launcher-bin needs a value}; shift 2 ;;
+    --launcher-src) launcher_src=${2:?--launcher-src needs a value}; shift 2 ;;
+    --library-swf)  library_swf=${2:?--library-swf needs a value}; shift 2 ;;
+    -h|--help)      usage; exit 0 ;;
+    *)              usage >&2; die "unknown argument: $1" ;;
+  esac
+done
+
+[ -n "$name" ]      || { usage >&2; die "--name is required"; }
+[ -n "$bundle_id" ] || { usage >&2; die "--id is required"; }
+[ -n "$version" ]   || { usage >&2; die "--version is required"; }
+[ -n "$out" ]       || { usage >&2; die "--out is required"; }
+[ -n "$swf" ]  && [ -f "$swf" ]  || die "--swf: no such file: ${swf:-<missing>}"
+[ -n "$icon" ] && [ -f "$icon" ] || die "--icon: no such file: ${icon:-<missing>}"
+if [ -n "$library_swf" ]; then
+  [[ $library_swf = /* ]] || die "--library-swf must be an absolute path: $library_swf"
+fi
+if [ -n "$launcher_bin" ] && [ -n "$launcher_src" ]; then
+  die "--launcher-bin and --launcher-src are mutually exclusive"
+fi
+
+SCRIPT_DIR=$(dirname "$(resolve "$0")")
+# The flash-bundler formula rewrites this exact line to its pkgshare copy.
+DEFAULT_LAUNCHER="${SCRIPT_DIR}/../launcher/launcher"
+if [ -z "$launcher_src" ]; then
+  launcher_bin=${launcher_bin:-"$DEFAULT_LAUNCHER"}
+  [ -f "$launcher_bin" ] || die "launcher binary not found: $launcher_bin"
+else
+  [ -f "$launcher_src" ] || die "--launcher-src: no such file: $launcher_src"
+fi
+
+# Executable name: CamelCase, alphanumerics only ("Electric Man 2" -> ElectricMan2)
+executable=$(printf '%s' "$name" | awk '{
+  n = split($0, w, /[^[:alnum:]]+/); out = ""
+  for (i = 1; i <= n; i++) if (w[i] != "")
+    out = out toupper(substr(w[i],1,1)) substr(w[i],2)
+  print out
+}')
+[ -n "$executable" ] || die "--name must contain at least one alphanumeric character"
+
+app="$out/$name.app"
+contents="$app/Contents"
+workdir=$(mktemp -d "${TMPDIR:-/tmp}/flash-bundler.XXXXXX")
+trap 'rm -rf "$workdir"' EXIT
+
+log "building '$app' (id=$bundle_id, executable=$executable)"
+rm -rf "$app"
+mkdir -p "$contents/MacOS" "$contents/Resources"
+
+# --- icon -------------------------------------------------------------------
+icns="$contents/Resources/$executable.icns"
+if [[ $icon == *.icns ]]; then
+  log "icon: .icns input, using as-is"
+  cp "$icon" "$icns"
+else
+  log "icon: rendering iconset from $(basename "$icon")"
+  iconset="$workdir/icon.iconset"
+  mkdir "$iconset"
+  for entry in \
+    icon_16x16.png:16 icon_16x16@2x.png:32 \
+    icon_32x32.png:32 icon_32x32@2x.png:64 \
+    icon_128x128.png:128 icon_128x128@2x.png:256 \
+    icon_256x256.png:256 icon_256x256@2x.png:512 \
+    icon_512x512.png:512 icon_512x512@2x.png:1024; do
+    fname=${entry%%:*} px=${entry##*:}
+    sips -s format png -z "$px" "$px" "$icon" --out "$iconset/$fname" >/dev/null \
+      || die "sips failed on $icon at ${px}px (unreadable image format?)"
+  done
+  iconutil -c icns "$iconset" -o "$icns" || die "iconutil failed"
+fi
+
+# --- swf --------------------------------------------------------------------
+if [ -n "$library_swf" ]; then
+  log "swf: installing to library path $library_swf"
+  mkdir -p "$(dirname "$library_swf")"
+  cp "$swf" "$library_swf"
+  chmod 644 "$library_swf"
+  swf_plist_value=$library_swf
+else
+  log "swf: embedding as Resources/game.swf"
+  cp "$swf" "$contents/Resources/game.swf"
+  chmod 644 "$contents/Resources/game.swf"
+  swf_plist_value="game.swf"
+fi
+
+# --- launcher ---------------------------------------------------------------
+if [ -n "$launcher_src" ]; then
+  log "launcher: compiling universal from $launcher_src"
+  cc -O2 -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 \
+     -framework Foundation -framework CoreFoundation \
+     -o "$contents/MacOS/$executable" "$launcher_src" \
+    || die "launcher compile failed"
+else
+  log "launcher: embedding prebuilt $(basename "$launcher_bin")"
+  cp "$launcher_bin" "$contents/MacOS/$executable"
+fi
+chmod 755 "$contents/MacOS/$executable"
+
+# --- Info.plist -------------------------------------------------------------
+cat > "$contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>$name</string>
+	<key>CFBundleDisplayName</key>
+	<string>$name</string>
+	<key>CFBundleExecutable</key>
+	<string>$executable</string>
+	<key>CFBundleIconFile</key>
+	<string>$executable</string>
+	<key>CFBundleIdentifier</key>
+	<string>$bundle_id</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$version</string>
+	<key>CFBundleVersion</key>
+	<string>$version</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>FlashGameSWF</key>
+	<string>$swf_plist_value</string>
+</dict>
+</plist>
+EOF
+plutil -lint -s "$contents/Info.plist" >/dev/null || die "generated Info.plist failed lint"
+
+# --- THE INVARIANT: strip quarantine, then sign, then verify -----------------
+# brew propagates com.apple.quarantine onto every staged file, and macOS
+# SIGKILLs quarantined Mach-O executables. Order is load-bearing.
+log "stripping extended attributes (quarantine)"
+xattr -cr "$app"
+log "ad-hoc signing"
+codesign --force -s - "$app" || die "codesign failed"
+codesign --verify --strict "$app" || die "codesign verification failed"
+
+log "OK"
+printf '%s\n' "$app"
