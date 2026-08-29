@@ -119,11 +119,14 @@ icns/plist/sign pipeline as flash-bundler, payload dir instead of a swf):
   imports assets headlessly there; the signed app stays read-only.
   Example: `godot-slime-soccer` (hectorbennett, MIT) — the remake variant,
   kept installable until formally deprecated.
-- **Web builds** — wrapped in `web-launcher` (an offline WKWebView window; no
-  network at play time, CDN scripts vendored). Self-contained, no runtime
-  cask. Example: `wip-slime-volleyball` (mmkal/slimejs, MIT) — BROKEN
-  upstream (its published dist has an empty games registry); kept only for
-  investigation.
+- **Web builds** — wrapped in `web-launcher` (a WKWebView window). Two modes:
+  fully-offline vendored payloads (CDN scripts vendored, no network at play
+  time), or a `site.conf` WRAPPER around a live site for games that are
+  actively maintained and may not be redistributed — nothing of theirs ships
+  in the app. Self-contained, no runtime cask. Examples:
+  `super-slime-soccer` (wrapper around the live superslimesoccer.io;
+  network required), `wip-slime-volleyball` (offline vendored; BROKEN
+  upstream — kept only for investigation).
 
 ## Uninstalling
 

@@ -1,6 +1,8 @@
-// web-launcher stub: a minimal offline "emulator" window for web-built games.
-// Loads Resources/<GamePayload default "web">/index.html from its own bundle
-// into a WKWebView. No network is required or expected at play time.
+// web-launcher stub: a minimal "emulator" window for web games.
+// Two modes, decided by the payload dir Resources/<GamePayload default "web">:
+//   - site.conf with a `url=` line -> load that LIVE site (wrapper mode; used
+//     for games we may not redistribute — nothing of theirs ships in the app)
+//   - otherwise -> load the payload's index.html fully offline
 // Build: clang -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 \
 //   -framework Cocoa -framework WebKit -o web-launcher web-launcher.m
 #import <Cocoa/Cocoa.h>
@@ -21,8 +23,31 @@
     NSNumber *h = [bundle objectForInfoDictionaryKey:@"GameWindowHeight"] ?: @620;
 
     NSString *payloadDir = [bundle.resourcePath stringByAppendingPathComponent:payload];
+
+    // Wrapper mode: site.conf names a remote URL to load instead of index.html.
+    NSURL *remote = nil;
+    NSString *confPath = [payloadDir stringByAppendingPathComponent:@"site.conf"];
+    NSString *conf = [NSString stringWithContentsOfFile:confPath
+                                               encoding:NSUTF8StringEncoding error:NULL];
+    if (conf) {
+        for (NSString *rawLine in [conf componentsSeparatedByCharactersInSet:
+                                        [NSCharacterSet newlineCharacterSet]]) {
+            NSString *line = [rawLine stringByTrimmingCharactersInSet:
+                                        [NSCharacterSet whitespaceCharacterSet]];
+            if ([line hasPrefix:@"url="]) {
+                remote = [NSURL URLWithString:[line substringFromIndex:4]];
+                break;
+            }
+        }
+        if (!remote || !([remote.scheme isEqualToString:@"https"])) {
+            fprintf(stderr, "Bad site.conf: need a `url=https://...` line in %s\n",
+                    confPath.UTF8String);
+            exit(1);
+        }
+    }
+
     NSString *index = [payloadDir stringByAppendingPathComponent:@"index.html"];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:index]) {
+    if (!remote && ![[NSFileManager defaultManager] fileExistsAtPath:index]) {
         // Mirror the fail() semantics of the exec-style launchers: always log
         // to stderr, dialog only when interactive, and exit nonzero so
         // headless/CI checks (ARI_FLASH_NO_DIALOG=1) see a real failure.
@@ -52,8 +77,12 @@
     WKWebViewConfiguration *cfg = [WKWebViewConfiguration new];
     WKWebView *web = [[WKWebView alloc] initWithFrame:frame configuration:cfg];
     web.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [web loadFileURL:[NSURL fileURLWithPath:index]
-        allowingReadAccessToURL:[NSURL fileURLWithPath:payloadDir isDirectory:YES]];
+    if (remote) {
+        [web loadRequest:[NSURLRequest requestWithURL:remote]];
+    } else {
+        [web loadFileURL:[NSURL fileURLWithPath:index]
+            allowingReadAccessToURL:[NSURL fileURLWithPath:payloadDir isDirectory:YES]];
+    }
     self.window.contentView = web;
 
     [self.window center];
