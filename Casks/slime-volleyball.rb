@@ -7,7 +7,7 @@
 # slime approaches can be kept and the other deprecated after testing.
 cask "slime-volleyball" do
   version "1.0.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "9cb6b1e0b83f5c02d48ffa0b8c1320fe37e35c44854c87be7e7d60d90f5c145e"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/wrap-bundler, web-launcher/web-launcher, games/slime-volleyball/.
