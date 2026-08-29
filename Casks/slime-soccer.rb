@@ -12,7 +12,7 @@
 # games/slime-soccer/PROVENANCE.md.
 cask "slime-soccer" do
   version "2.1.1"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "199e708e9ea64275373c686ad3e850e0239c2ba14d3d1d7fc83d281e44025aae"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/wrap-bundler, java-launcher/java-launcher, games/slime-soccer/.
