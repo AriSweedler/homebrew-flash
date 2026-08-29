@@ -111,7 +111,8 @@ icns/plist/sign pipeline as flash-bundler, payload dir instead of a swf):
   pinned notarized Temurin 17 JRE from the `ari-flash-jre` cask, exec'd by
   `java-launcher` (the ruffle pattern; `-Xdock:` flags carry the game's dock
   identity). The applet class rides in the payload as `game/applet.conf`.
-  Examples: `slime-soccer`, `slime-volleyball` — each payload dir carries a
+  Examples: `slime-soccer`, `slime-volleyball` (One Slime, 1P-vs-CPU),
+  `slime-volleyball-2p` (PvP) — each payload dir carries a
   PROVENANCE.md with sources, sha256s, and the freeware-redistribution note.
 - **Godot 3 projects** — run by `godot-launcher` via the pinned `godot3`
   runtime cask. First launch copies the project to Application Support and
@@ -154,6 +155,13 @@ the godot3 zap if you use Godot yourself.
 
 If homebrew-cask ever ships its own `ruffle` token, use the tap-qualified
 names: `brew install arisweedler/flash/ruffle`, etc.
+
+## Content & licensing
+
+See [NOTICE.md](NOTICE.md): this tap is for personal, non-commercial use by
+the owner and friends. Runtimes are fetched from their official upstreams
+(never rehosted); hosted game content is freeware/MIT with per-game
+provenance and a standing takedown pledge.
 
 ## Testing
 

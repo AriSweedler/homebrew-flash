@@ -54,6 +54,8 @@ it back to the drawing board — do not hand-fix the test machine.
     reports Temurin 17; `/Applications/Slime Soccer.app` exists.
 - [ ] `brew install arisweedler/flash/slime-volleyball` (the JAVA original)
   - Success: exits 0 (JRE already present); `/Applications/Slime Volleyball.app` exists.
+- [ ] `brew install arisweedler/flash/slime-volleyball-2p` (the PvP original)
+  - Success: exits 0 (JRE already present); `/Applications/Slime Volleyball 2P.app` exists.
 - [ ] `brew install arisweedler/flash/godot-slime-soccer` (godot trial variant)
   - Success: pulls the `godot3` cask automatically; `/Applications/Godot 3.app`
     and `/Applications/Godot Slime Soccer.app` exist.
@@ -87,8 +89,11 @@ Java originals (deferred GUI checks from authoring — all four matter):
       (One Slime, 1-player-vs-CPU); an offline "Couldn't connect to server!"
       dialog about high scores is EXPECTED and benign — dismiss it (see
       games/slime-volleyball/PROVENANCE.md); gameplay is fully local.
-- [ ] Both run with Wi-Fi off (soccer is bytecode-audited no-network;
-      volleyball only phones home for high scores, which fail gracefully).
+- [ ] Double-click `/Applications/Slime Volleyball 2P.app` — window at 700x350;
+      both players' keys work on one keyboard (P1 A/W/D, P2 arrows).
+- [ ] All three run with Wi-Fi off (soccer and 2P are bytecode-audited
+      no-network; One Slime only phones home for high scores, which fail
+      gracefully).
 - [ ] Quitting the window fully exits the process (no lingering java in
       `ps -ax | grep ari-flash-java`).
 
