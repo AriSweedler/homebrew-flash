@@ -83,10 +83,12 @@ Java originals (deferred GUI checks from authoring — all four matter):
 - [ ] Double-click `/Applications/Slime Soccer.app` — window renders at 700x350;
       dock shows the game name/icon (not a generic java cup); keyboard input
       works; focus returns after cmd-tab away and back.
-- [ ] Double-click `/Applications/Slime Volleyball.app` — window at 600x350;
-      the clipped ground band at the bottom is INTENTIONAL (authentic embed
-      size; see games/slime-volleyball/PROVENANCE.md); two-player keys work.
-- [ ] Both run with Wi-Fi off (bytecode-audited: no network).
+- [ ] Double-click `/Applications/Slime Volleyball.app` — window at 750x375
+      (One Slime, 1-player-vs-CPU); an offline "Couldn't connect to server!"
+      dialog about high scores is EXPECTED and benign — dismiss it (see
+      games/slime-volleyball/PROVENANCE.md); gameplay is fully local.
+- [ ] Both run with Wi-Fi off (soccer is bytecode-audited no-network;
+      volleyball only phones home for high scores, which fail gracefully).
 - [ ] Quitting the window fully exits the process (no lingering java in
       `ps -ax | grep ari-flash-java`).
 

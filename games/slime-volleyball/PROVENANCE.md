@@ -1,3 +1,27 @@
+# Slime Volleyball (One Slime 2007) — provenance
+
+SHIPPED VARIANT (v2.1.0+): the ORIGINAL One Slime (Quin Pendragon, 2007 build)
+— 1-player-vs-CPU Slime Volleyball ending in the Inferno boss. User-selected.
+
+| file | what | sha256 |
+|---|---|---|
+| `OneSlime2007.jar` (source; shipped extracted as loose classes) | fetched from oneslime.net `/one/` per its `attributes.json` (`code=Slime1P.class`, 750x375); Java 1.1 bytecode, pure AWT | `17cab06a8f2b9f3fcbdd6dbacead27f717f10bb3516b2f58b4cc4c1015d69a1b` |
+
+Classes are shipped extracted (a-h, NameFrame, ServerCheck, Slime1P) because
+java-launcher's classpath is `slime-harness.jar:<payload dir>` — loose classes,
+no per-game jar entries.
+
+Offline behavior (bytecode-audited): the game submits high scores/replays to
+oneslime.net (`submitscore.php`, `newreplay.php`) and shows a benign
+"Couldn't connect to server! Your high scores may not be saved." AWT dialog
+when unreachable — gameplay is fully local. The boss-page link goes through
+AppletContext.showDocument, a deliberate no-op in the harness.
+
+Icon: user-provided artwork (2026-08-29).
+
+---
+# Prior shipped variant (v2.0.0): Two Player Slime (1999) — provenance below
+
 # Slime Volleyball (Java) — provenance
 
 ## Payload
