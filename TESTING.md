@@ -100,15 +100,18 @@ Java originals (deferred GUI checks from authoring — all four matter):
       must work IMMEDIATELY after launch and again after clicking the window
       — the harness now forwards frame-level key events to the applet, so
       focus placement cannot swallow input.
-- [ ] Lag A/B (the JVM now defaults to the OpenGL java2d pipeline;
-      JDK 17's Metal default stuttered on these unbuffered 1999 renderers).
-      If anything still feels laggy, compare from a terminal:
+- [ ] Smoothness (soccer/volleyball >= 2.1.2, 2p >= 1.0.2): rendering uses
+      the JDK-default Metal pipeline, which is vsynced — the games are
+      internally double-buffered and tick at ~50 FPS by design, so motion
+      should be smooth and tear-free. (A briefly-shipped OpenGL default
+      caused tearing/"flicker" and was reverted.) If stutter appears, A/B
+      from a terminal and record which is smoother:
       ```sh
-      "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"          # OpenGL (default)
-      ARI_FLASH_JAVA_OPTS="-Dsun.java2d.metal=true" \
-        "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"        # Metal
+      "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"          # Metal (default)
+      ARI_FLASH_JAVA_OPTS="-Dsun.java2d.metal=false" \
+        "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"        # OpenGL
       ```
-      Record which is smoother; ARI_FLASH_JAVA_OPTS takes arbitrary JVM flags.
+      ARI_FLASH_JAVA_OPTS takes arbitrary JVM flags.
 
 Godot trial variant:
 - [ ] Double-click `/Applications/Godot Slime Soccer.app`. Its FIRST

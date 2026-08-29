@@ -121,12 +121,12 @@ int main(void) {
                 [argStrings addObject:[NSString stringWithFormat:@"-Xdock:icon=%@", icns]];
             }
         }
-        // 1999-era applets draw unbuffered via getGraphics(); the Metal
-        // java2d pipeline (default since JDK 17) stutters on that pattern.
-        // Default to the OpenGL pipeline; ARI_FLASH_JAVA_OPTS can override
-        // (later -D duplicates win), e.g. for A/B on the test machine:
-        //   ARI_FLASH_JAVA_OPTS="-Dsun.java2d.metal=true" <app>/Contents/MacOS/<Exe>
-        [argStrings addObject:@"-Dsun.java2d.metal=false"];
+        // Pipeline note: JDK 17 defaults java2d to Metal, which is vsynced
+        // (displaySync) — the games are internally double-buffered, so Metal
+        // presents them tear-free. A briefly-shipped -Dsun.java2d.metal=false
+        // default caused visible tearing ("flickery") and was reverted.
+        // ARI_FLASH_JAVA_OPTS passes arbitrary JVM flags for A/B, e.g.:
+        //   ARI_FLASH_JAVA_OPTS="-Dsun.java2d.metal=false" <app>/Contents/MacOS/<Exe>
         const char *extraOpts = getenv("ARI_FLASH_JAVA_OPTS");
         if (extraOpts && *extraOpts) {
             for (NSString *opt in [@(extraOpts) componentsSeparatedByCharactersInSet:
