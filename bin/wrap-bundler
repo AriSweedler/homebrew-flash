@@ -40,6 +40,9 @@ EOF
 log() { printf 'wrap-bundler: %s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
+# Escape a value for interpolation into the Info.plist XML heredoc.
+xml_escape() { local s=${1//&/&amp;}; s=${s//</&lt;}; printf '%s' "${s//>/&gt;}"; }
+
 name="" bundle_id="" payload="" payload_name="web" icon="" version="" out=""
 launcher_bin="" window="" desc="" updated=""
 
@@ -65,6 +68,17 @@ done
 [ -n "$bundle_id" ] || { usage >&2; die "--id is required"; }
 [ -n "$version" ]   || { usage >&2; die "--version is required"; }
 [ -n "$out" ]       || { usage >&2; die "--out is required"; }
+# The name becomes the .app directory name ("$out/$name.app", freshly rm -rf'd):
+# a '/' would nest (or escape) directories, a leading '.' hides the app.
+case $name in
+  */*) die "--name must not contain '/': $name" ;;
+  .*)  die "--name must not start with '.': $name" ;;
+esac
+# Same rules for the payload dir name inside Contents/Resources.
+case $payload_name in
+  */*) die "--payload-name must not contain '/': $payload_name" ;;
+  .*)  die "--payload-name must not start with '.': $payload_name" ;;
+esac
 [ -n "$payload" ] && [ -d "$payload" ] || die "--payload: no such directory: ${payload:-<missing>}"
 [ -n "$icon" ] && [ -f "$icon" ] || die "--icon: no such file: ${icon:-<missing>}"
 [ -n "$launcher_bin" ] && [ -f "$launcher_bin" ] || die "--launcher-bin: no such file: ${launcher_bin:-<missing>}"
@@ -77,9 +91,12 @@ if [ -n "$updated" ]; then
   [[ $updated =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "--updated must be YYYY-MM-DD: $updated"
 fi
 
-# Executable name: CamelCase, alphanumerics only ("Slime Volleyball" -> SlimeVolleyball)
-executable=$(printf '%s' "$name" | awk '{
-  n = split($0, w, /[^[:alnum:]]+/); out = ""
+# Executable name: CamelCase, ASCII alphanumerics only ("Slime Volleyball" ->
+# SlimeVolleyball). LC_ALL=C + an explicit ASCII class so multibyte characters
+# are dropped byte-wise deterministically (macOS awk's toupper/split are
+# byte-wise and would otherwise mangle UTF-8 into an invalid-UTF-8 filename).
+executable=$(printf '%s' "$name" | LC_ALL=C awk '{
+  n = split($0, w, /[^a-zA-Z0-9]+/); out = ""
   for (i = 1; i <= n; i++) if (w[i] != "")
     out = out toupper(substr(w[i],1,1)) substr(w[i],2)
   print out
@@ -127,10 +144,11 @@ cp "$launcher_bin" "$contents/MacOS/$executable"
 chmod 755 "$contents/MacOS/$executable"
 
 # --- Info.plist -----------------------------------------------------------------
+name_xml=$(xml_escape "$name")
+payload_name_xml=$(xml_escape "$payload_name")
 meta_plist=""
 if [ -n "$desc" ]; then
-  desc_xml=${desc//&/&amp;}; desc_xml=${desc_xml//</&lt;}; desc_xml=${desc_xml//>/&gt;}
-  meta_plist+=$(printf '\n\t<key>FlashGameDescription</key>\n\t<string>%s</string>' "$desc_xml")
+  meta_plist+=$(printf '\n\t<key>FlashGameDescription</key>\n\t<string>%s</string>' "$(xml_escape "$desc")")
 fi
 if [ -n "$updated" ]; then
   meta_plist+=$(printf '\n\t<key>FlashGameUpdated</key>\n\t<string>%s</string>' "$updated")
@@ -145,9 +163,9 @@ cat > "$contents/Info.plist" <<EOF
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>$name</string>
+	<string>$name_xml</string>
 	<key>CFBundleDisplayName</key>
-	<string>$name</string>
+	<string>$name_xml</string>
 	<key>CFBundleExecutable</key>
 	<string>$executable</string>
 	<key>CFBundleIconFile</key>
@@ -165,11 +183,12 @@ cat > "$contents/Info.plist" <<EOF
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>GamePayload</key>
-	<string>$payload_name</string>${window_plist}${meta_plist}
+	<string>$payload_name_xml</string>${window_plist}${meta_plist}
 </dict>
 </plist>
 EOF
-plutil -lint -s "$contents/Info.plist" >/dev/null || die "generated Info.plist failed lint"
+plutil -lint "$contents/Info.plist" >&2 \
+  || die "generated Info.plist failed lint (unescaped character in --name/--desc?)"
 
 # --- THE INVARIANT: strip quarantine, then sign, then verify -----------------
 # brew propagates com.apple.quarantine onto every staged file, and macOS

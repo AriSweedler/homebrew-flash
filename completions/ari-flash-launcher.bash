@@ -1,5 +1,8 @@
 # bash completion for ari-flash-launcher. Installed by the ari-flash-launcher
 # formula. Game slugs are completed live from `list-installed --porcelain`.
+#
+# NOTE: the command list below is mirrored in bin/ari-flash-launcher (main()
+# dispatch) and completions/_ari-flash-launcher — update all three together.
 
 _ari_flash_launcher() {
   local cur cmd

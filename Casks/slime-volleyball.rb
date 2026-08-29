@@ -16,6 +16,14 @@ cask "slime-volleyball" do
   desc "Faithful JS port of the classic Java-applet Slime Volleyball (mmkal/slimejs)"
   homepage "https://github.com/mmkal/slimejs"
 
+  # All the tap's games share one GitHub repo; scan all releases and anchor
+  # to this cask's own tag prefix (see the template's livecheck comment).
+  livecheck do
+    url :url
+    strategy :github_releases
+    regex(/^slime-volleyball-v(\d+(?:\.\d+)+)$/i)
+  end
+
   depends_on formula: "arisweedler/flash/ari-flash-launcher"
   depends_on :macos
 
@@ -42,9 +50,12 @@ cask "slime-volleyball" do
                    print_stderr: true
   end
 
-  # WKWebView's per-app storage.
+  # WKWebView's per-app storage (HTTPStorages glob also covers the
+  # .binarycookies sibling file macOS creates for any CFNetwork/WebKit app).
   zap trash: [
     "~/Library/Caches/com.arisweedler.flash.slime-volleyball",
+    "~/Library/HTTPStorages/com.arisweedler.flash.slime-volleyball*",
+    "~/Library/Preferences/com.arisweedler.flash.slime-volleyball.plist",
     "~/Library/Saved Application State/com.arisweedler.flash.slime-volleyball.savedState",
     "~/Library/WebKit/com.arisweedler.flash.slime-volleyball",
   ]

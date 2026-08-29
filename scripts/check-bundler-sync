@@ -1,0 +1,112 @@
+#!/bin/bash
+# check-bundler-sync — guard against drift between bin/flash-bundler and
+# bin/wrap-bundler.
+#
+# The two bundlers are DELIBERATELY two self-contained copies: game casks
+# execute the snapshot inside their pinned, immutable release asset
+# ("#{staged_path}/bin/flash-bundler" / ".../bin/wrap-bundler"), so a shared
+# sourced lib would change the asset layout for every future release. The
+# price is that shared fixes must land twice; this script makes forgetting
+# the second copy a loud failure instead of silent drift.
+#
+# Usage:
+#   scripts/check-bundler-sync
+#
+# Checks (all must pass):
+#   1. bash -n / zsh -n (per shebang) on every script in bin/ and scripts/
+#   2. the shared regions of the two bundlers are byte-identical:
+#        - the xml_escape helper
+#        - the icon/iconset pipeline
+#        - the executable-derivation awk
+#   3. THE INVARIANT block keeps the same command sequence in both
+#      (assemble -> xattr -cr -> codesign --force -s - -> codesign --verify
+#      --strict; log/die wording may differ, the commands may not)
+set -euo pipefail
+
+log() { printf 'check-bundler-sync: %s\n' "$*" >&2; }
+die() { log "ERROR: $*"; exit 1; }
+
+cd "$(git rev-parse --show-toplevel)"
+fb=bin/flash-bundler
+wb=bin/wrap-bundler
+[[ -f $fb && -f $wb ]] || die "expected $fb and $wb at the repo root"
+
+fail=0
+
+# --- 1: syntax-check every script per its shebang -----------------------------
+for f in bin/* scripts/*; do
+  [[ -f $f ]] || continue
+  shebang=$(head -n1 "$f")
+  case "$shebang" in
+    '#!/bin/bash'*) checker=(bash -n) ;;
+    '#!/bin/zsh'*)  checker=(zsh -n) ;;
+    '#!'*)          log "skipping $f (unhandled shebang: $shebang)"; continue ;;
+    *)              log "skipping $f (no shebang)"; continue ;;
+  esac
+  if "${checker[@]}" "$f"; then
+    log "OK   ${checker[0]} -n $f"
+  else
+    log "FAIL ${checker[0]} -n $f"
+    fail=1
+  fi
+done
+
+# --- 2: shared regions must be byte-identical ---------------------------------
+# Each region is extracted by a LITERAL start-of-line prefix pair (inclusive).
+# The extraction dies if a region is missing, so a refactor that moves an
+# anchor fails loudly rather than comparing nothing.
+extract() { # extract <file> <start-prefix> <end-prefix>
+  awk -v start="$2" -v end="$3" '
+    index($0, start) == 1 { found = 1; p = 1 }
+    p { print }
+    p && index($0, end) == 1 && index($0, start) != 1 { exit }
+    END { if (!found) exit 3 }
+  ' "$1" || die "region '$2'..'$3' not found in $1"
+}
+
+check_region() { # check_region <label> <start-prefix> <end-prefix>
+  local label=$1 start=$2 end=$3 a b
+  a=$(extract "$fb" "$start" "$end")
+  b=$(extract "$wb" "$start" "$end")
+  if [[ $a == "$b" ]]; then
+    log "OK   shared region in sync: $label"
+  else
+    log "FAIL shared region drifted: $label"
+    diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/  /' >&2 || true
+    fail=1
+  fi
+}
+
+# xml_escape is a one-liner: compare it directly.
+a=$(grep '^xml_escape()' "$fb") || die "xml_escape helper not found in $fb"
+b=$(grep '^xml_escape()' "$wb") || die "xml_escape helper not found in $wb"
+if [[ $a == "$b" ]]; then
+  log "OK   shared region in sync: xml_escape helper"
+else
+  log "FAIL shared region drifted: xml_escape helper"
+  fail=1
+fi
+
+check_region "icon/iconset pipeline" 'icns=' 'fi'
+check_region "executable-derivation awk" \
+  'executable=$(printf' '[ -n "$executable" ]'
+
+# --- 3: THE INVARIANT command sequence ----------------------------------------
+# Wording of log()/die() may differ between the siblings; the commands and
+# their order are load-bearing and may not.
+invariant_cmds() {
+  extract "$1" '# --- THE INVARIANT' 'codesign --verify --strict' \
+    | sed -e '/^#/d' -e '/^log /d' -e 's/ *|| die .*//' -e '/^$/d'
+}
+a=$(invariant_cmds "$fb")
+b=$(invariant_cmds "$wb")
+if [[ $a == "$b" ]]; then
+  log "OK   invariant command sequence in sync"
+else
+  log "FAIL invariant command sequence drifted"
+  diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/  /' >&2 || true
+  fail=1
+fi
+
+[[ $fail -eq 0 ]] || die "bundlers have drifted (see FAIL lines above)"
+log "all checks passed"

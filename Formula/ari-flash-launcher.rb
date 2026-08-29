@@ -17,5 +17,9 @@ class AriFlashLauncher < Formula
 
   test do
     assert_match "Usage:", shell_output("#{bin}/ari-flash-launcher --help")
+    # Exercise the offline scan path (scan_games + default-command dispatch)
+    # against an empty app dir, not just --help.
+    ENV["ARI_FLASH_APP_DIRS"] = testpath.to_s
+    assert_match "No flash games installed", shell_output("#{bin}/ari-flash-launcher list")
   end
 end

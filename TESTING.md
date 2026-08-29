@@ -10,11 +10,14 @@ it back to the drawing board — do not hand-fix the test machine.
 - [ ] Machine has Homebrew installed and working: `brew --version`
 - [ ] Machine has NO prior state from this tap:
   ```sh
-  brew list --cask 2>/dev/null | grep -Ei 'ruffle|bubble' && echo "DIRTY" || echo "clean"
-  ls /Applications | grep -Ei 'ruffle|bubble' && echo "DIRTY" || echo "clean"
+  brew list --cask 2>/dev/null | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top' && echo "DIRTY" || echo "clean"
+  ls /Applications | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top' && echo "DIRTY" || echo "clean"
   brew untap arisweedler/flash 2>/dev/null; true
   ```
   If dirty, uninstall/zap leftovers first so this is a true fresh-install test.
+  A hit on `godot` is expected if the test machine has a personal Godot
+  install — judge those by path. Extend the pattern when a new game's display
+  name shares no token with these.
 - [ ] Note the arch (`uname -m`) — record it with results; we support arm64 and x86_64.
 - [ ] Xcode CLT is NOT required for this test. Do not install it to make something pass;
   if a step demands a compiler, that is a design failure — record it.
@@ -42,6 +45,14 @@ it back to the drawing board — do not hand-fix the test machine.
     - No password prompts beyond brew's normal behavior, no Xcode/CLT demands.
   - Failure capture: full install log (`brew install arisweedler/flash/bubble-trouble 2>&1 | tee install.log`).
 
+## 2b. Install the wrapped games
+
+- [ ] `brew install arisweedler/flash/slime-volleyball`
+  - Success: exits 0; NO ruffle pulled; `/Applications/Slime Volleyball.app` exists.
+- [ ] `brew install arisweedler/flash/slime-soccer`
+  - Success: pulls the `godot3` cask automatically; `/Applications/Godot 3.app`
+    and `/Applications/Slime Soccer.app` exist.
+
 ## 3. Launch path A — the .app (double-click UX)
 
 - [ ] Open `/Applications/Bubble Trouble.app` from Finder by double-click (do NOT use
@@ -58,6 +69,19 @@ it back to the drawing board — do not hand-fix the test machine.
     xattr -lr "/Applications/Bubble Trouble.app"
     ```
 
+## 3b. Launch the wrapped games
+
+- [ ] Double-click `/Applications/Slime Volleyball.app` from Finder — it must
+      open its own window with no network (verify by toggling Wi-Fi off once).
+- [ ] Double-click `/Applications/Slime Soccer.app` from Finder. Its FIRST
+      launch must create
+      `~/Library/Application Support/com.arisweedler.flash.slime-soccer`
+      (the writable project copy) and
+      `~/Library/Application Support/Godot/app_userdata/Slime Soccer`,
+      and the installed .app must stay unmodified — record that
+      `find '/Applications/Slime Soccer.app' -newer /Applications -type f`
+      is empty.
+
 ## 4. Launch path B — the CLI
 
 - [ ] `which ari-flash-launcher` → a brew bin path.
@@ -66,7 +90,19 @@ it back to the drawing board — do not hand-fix the test machine.
       matches the documented UX (record whether it blocks until quit).
 - [ ] `ari-flash-launcher does-not-exist` → clear error, non-zero exit, lists what IS
       installed.
-- Failure capture: `ari-flash-launcher --help` output; `RUFFLE_PATH= ari-flash-launcher -v bubble-trouble` if a verbose flag exists.
+- [ ] `ari-flash-launcher list` and `ari-flash-launcher ls` → same table as no-args;
+      `ari-flash-launcher list-installed --porcelain` → tab-separated rows.
+- [ ] `ari-flash-launcher list-upstream` → table of every released game with `*` next
+      to installed ones (needs network; requires jq, which brew installed as a formula
+      dependency).
+- [ ] Completions installed: `ls $(brew --prefix)/share/zsh/site-functions/_ari-flash-launcher`
+      and `$(brew --prefix)/etc/bash_completion.d/ari-flash-launcher` both exist; in a
+      fresh zsh, `ari-flash-launcher <TAB>` offers the subcommands.
+- Failure capture: `ari-flash-launcher --help` output;
+  `ARI_FLASH_DRY_RUN=1 ari-flash-launcher bubble-trouble` (prints the `open` command it
+  would run instead of running it). Separately: `RUFFLE_PATH` is the env var the in-app
+  launcher honors to point at an alternate Ruffle binary — it is not read by
+  `ari-flash-launcher` itself.
 
 ## 5. Ruffle standalone
 
@@ -126,15 +162,24 @@ brew upgrade   arisweedler/flash/bubble-trouble    # version was bumped
 - [ ] `brew uninstall --zap arisweedler/flash/ruffle`
   - `/Applications/Ruffle.app` gone; `~/Library/Application Support/ruffle` gone (dirs-crate path);
     ruffle prefs/caches/saved-state gone (per step 6 recordings).
+- [ ] `brew uninstall --zap arisweedler/flash/slime-volleyball` → app gone AND its zap
+      paths (from the cask file: WebKit storage/caches, saved state) gone.
+- [ ] `brew uninstall --zap arisweedler/flash/slime-soccer` → app gone AND its zap paths
+      (from the cask file: the Application Support project copy, Godot app_userdata) gone.
+- [ ] `brew uninstall --zap arisweedler/flash/godot3` → `/Applications/Godot 3.app` gone
+      AND its zap paths (from the cask file) gone.
 - [ ] `brew autoremove` → removes `ari-flash-launcher` (it was only a dependency).
       If it does not, record it; README must document the extra
       `brew uninstall ari-flash-launcher`.
 - [ ] Final sweep — expect NO hits:
   ```sh
-  ls /Applications | grep -Ei 'ruffle|bubble'
-  brew list | grep -Ei 'ruffle|bubble|ari-flash'
-  find ~/Library -maxdepth 3 \( -iname '*ruffle*' -o -iname '*arisweedler*' \) 2>/dev/null
+  ls /Applications | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top'
+  brew list | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top|ari-flash'
+  find ~/Library -maxdepth 3 \( -iname '*ruffle*' -o -iname '*godot*' -o -iname '*slime*' -o -iname '*arisweedler*' \) 2>/dev/null
   ```
+  A hit on `godot` is expected if the test machine has a personal Godot
+  install — judge those by path. Extend the pattern when a new game's display
+  name shares no token with these.
 - [ ] `brew untap arisweedler/flash` → exits 0.
 
 ## 9. Report

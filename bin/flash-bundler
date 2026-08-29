@@ -10,8 +10,8 @@ usage() {
   cat <<'EOF'
 usage: flash-bundler --name <Display Name> --id <bundle-id> --swf <path>
                      --icon <path> --version <semver> --out <dir>
-                     [--launcher-bin <path>] [--launcher-src <path>]
-                     [--library-swf <abs path>]
+                     [--launcher-bin <path>] [--window <WxH>]
+                     [--desc <text>] [--updated <YYYY-MM-DD>]
 
 Builds "<out>/<Display Name>.app" containing the swf, a generated .icns, the
 launcher stub, and an ad-hoc code signature.
@@ -25,10 +25,6 @@ launcher stub, and an ad-hoc code signature.
   --out           Directory to create the .app in
   --launcher-bin  Prebuilt launcher Mach-O to embed
                   (default: <bundler dir>/../launcher/launcher)
-  --launcher-src  Compile this launcher.m instead (universal; needs a compiler
-                  — authoring machines only, never end users)
-  --library-swf   Install the swf at this ABSOLUTE path instead of embedding,
-                  and point the app there via Info.plist FlashGameSWF
   --desc <text>   One-line game description, baked into Info.plist as
                   FlashGameDescription (shown by 'ari-flash-launcher list')
   --updated <date> YYYY-MM-DD the game was last updated in the tap; baked in
@@ -41,6 +37,9 @@ EOF
 
 log() { printf 'flash-bundler: %s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
+
+# Escape a value for interpolation into the Info.plist XML heredoc.
+xml_escape() { local s=${1//&/&amp;}; s=${s//</&lt;}; printf '%s' "${s//>/&gt;}"; }
 
 # realpath(1) is not on every macOS; resolve symlinks portably so the default
 # launcher path works when brew symlinks us into <prefix>/bin.
@@ -55,7 +54,7 @@ resolve() {
 }
 
 name="" bundle_id="" swf="" icon="" version="" out=""
-launcher_bin="" launcher_src="" library_swf="" window="" desc="" updated=""
+launcher_bin="" window="" desc="" updated=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -66,8 +65,6 @@ while [ $# -gt 0 ]; do
     --version)      version=${2:?--version needs a value}; shift 2 ;;
     --out)          out=${2:?--out needs a value}; shift 2 ;;
     --launcher-bin) launcher_bin=${2:?--launcher-bin needs a value}; shift 2 ;;
-    --launcher-src) launcher_src=${2:?--launcher-src needs a value}; shift 2 ;;
-    --library-swf)  library_swf=${2:?--library-swf needs a value}; shift 2 ;;
     --window)       window=${2:?--window needs a value}; shift 2 ;;
     --desc)         desc=${2:?--desc needs a value}; shift 2 ;;
     --updated)      updated=${2:?--updated needs a value}; shift 2 ;;
@@ -80,14 +77,14 @@ done
 [ -n "$bundle_id" ] || { usage >&2; die "--id is required"; }
 [ -n "$version" ]   || { usage >&2; die "--version is required"; }
 [ -n "$out" ]       || { usage >&2; die "--out is required"; }
+# The name becomes the .app directory name ("$out/$name.app", freshly rm -rf'd):
+# a '/' would nest (or escape) directories, a leading '.' hides the app.
+case $name in
+  */*) die "--name must not contain '/': $name" ;;
+  .*)  die "--name must not start with '.': $name" ;;
+esac
 [ -n "$swf" ]  && [ -f "$swf" ]  || die "--swf: no such file: ${swf:-<missing>}"
 [ -n "$icon" ] && [ -f "$icon" ] || die "--icon: no such file: ${icon:-<missing>}"
-if [ -n "$library_swf" ]; then
-  [[ $library_swf = /* ]] || die "--library-swf must be an absolute path: $library_swf"
-fi
-if [ -n "$launcher_bin" ] && [ -n "$launcher_src" ]; then
-  die "--launcher-bin and --launcher-src are mutually exclusive"
-fi
 window_width="" window_height=""
 if [ -n "$window" ]; then
   [[ $window =~ ^([0-9]+)x([0-9]+)$ ]] || die "--window must be <width>x<height> in pixels: $window"
@@ -100,16 +97,15 @@ fi
 SCRIPT_DIR=$(dirname "$(resolve "$0")")
 # The flash-bundler formula rewrites this exact line to its pkgshare copy.
 DEFAULT_LAUNCHER="${SCRIPT_DIR}/../launcher/launcher"
-if [ -z "$launcher_src" ]; then
-  launcher_bin=${launcher_bin:-"$DEFAULT_LAUNCHER"}
-  [ -f "$launcher_bin" ] || die "launcher binary not found: $launcher_bin"
-else
-  [ -f "$launcher_src" ] || die "--launcher-src: no such file: $launcher_src"
-fi
+launcher_bin=${launcher_bin:-"$DEFAULT_LAUNCHER"}
+[ -f "$launcher_bin" ] || die "launcher binary not found: $launcher_bin"
 
-# Executable name: CamelCase, alphanumerics only ("Electric Man 2" -> ElectricMan2)
-executable=$(printf '%s' "$name" | awk '{
-  n = split($0, w, /[^[:alnum:]]+/); out = ""
+# Executable name: CamelCase, ASCII alphanumerics only ("Electric Man 2" ->
+# ElectricMan2). LC_ALL=C + an explicit ASCII class so multibyte characters are
+# dropped byte-wise deterministically (macOS awk's toupper/split are byte-wise
+# and would otherwise mangle UTF-8 into an invalid-UTF-8 filename).
+executable=$(printf '%s' "$name" | LC_ALL=C awk '{
+  n = split($0, w, /[^a-zA-Z0-9]+/); out = ""
   for (i = 1; i <= n; i++) if (w[i] != "")
     out = out toupper(substr(w[i],1,1)) substr(w[i],2)
   print out
@@ -148,39 +144,22 @@ else
 fi
 
 # --- swf --------------------------------------------------------------------
-if [ -n "$library_swf" ]; then
-  log "swf: installing to library path $library_swf"
-  mkdir -p "$(dirname "$library_swf")"
-  cp "$swf" "$library_swf"
-  chmod 644 "$library_swf"
-  swf_plist_value=$library_swf
-else
-  log "swf: embedding as Resources/game.swf"
-  cp "$swf" "$contents/Resources/game.swf"
-  chmod 644 "$contents/Resources/game.swf"
-  swf_plist_value="game.swf"
-fi
+log "swf: embedding as Resources/game.swf"
+cp "$swf" "$contents/Resources/game.swf"
+chmod 644 "$contents/Resources/game.swf"
 
 # --- launcher ---------------------------------------------------------------
-if [ -n "$launcher_src" ]; then
-  log "launcher: compiling universal from $launcher_src"
-  cc -O2 -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 \
-     -framework Foundation -framework CoreFoundation \
-     -o "$contents/MacOS/$executable" "$launcher_src" \
-    || die "launcher compile failed"
-else
-  log "launcher: embedding prebuilt $(basename "$launcher_bin")"
-  cp "$launcher_bin" "$contents/MacOS/$executable"
-fi
+log "launcher: embedding prebuilt $(basename "$launcher_bin")"
+cp "$launcher_bin" "$contents/MacOS/$executable"
 chmod 755 "$contents/MacOS/$executable"
 
 # --- Info.plist -------------------------------------------------------------
 # Optional window size: the launcher passes these to ruffle as --width/--height
 # (old movies declare tiny stages and ruffle otherwise opens at exactly that).
+name_xml=$(xml_escape "$name")
 meta_plist=""
 if [ -n "$desc" ]; then
-  desc_xml=${desc//&/&amp;}; desc_xml=${desc_xml//</&lt;}; desc_xml=${desc_xml//>/&gt;}
-  meta_plist+=$(printf '\n\t<key>FlashGameDescription</key>\n\t<string>%s</string>' "$desc_xml")
+  meta_plist+=$(printf '\n\t<key>FlashGameDescription</key>\n\t<string>%s</string>' "$(xml_escape "$desc")")
 fi
 if [ -n "$updated" ]; then
   meta_plist+=$(printf '\n\t<key>FlashGameUpdated</key>\n\t<string>%s</string>' "$updated")
@@ -195,9 +174,9 @@ cat > "$contents/Info.plist" <<EOF
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>$name</string>
+	<string>$name_xml</string>
 	<key>CFBundleDisplayName</key>
-	<string>$name</string>
+	<string>$name_xml</string>
 	<key>CFBundleExecutable</key>
 	<string>$executable</string>
 	<key>CFBundleIconFile</key>
@@ -213,11 +192,12 @@ cat > "$contents/Info.plist" <<EOF
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
 	<key>FlashGameSWF</key>
-	<string>$swf_plist_value</string>${window_plist}${meta_plist}
+	<string>game.swf</string>${window_plist}${meta_plist}
 </dict>
 </plist>
 EOF
-plutil -lint -s "$contents/Info.plist" >/dev/null || die "generated Info.plist failed lint"
+plutil -lint "$contents/Info.plist" >&2 \
+  || die "generated Info.plist failed lint (unescaped character in --name/--desc?)"
 
 # --- THE INVARIANT: strip quarantine, then sign, then verify -----------------
 # brew propagates com.apple.quarantine onto every staged file, and macOS

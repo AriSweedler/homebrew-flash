@@ -12,6 +12,18 @@ cask "godot3" do
   desc "Pinned Godot 3 runtime used by the tap's Godot-remake games"
   homepage "https://godotengine.org/"
 
+  # Without this, the default livecheck strategy returns the latest 4.x
+  # release and brew livecheck would suggest an upgrade to Godot 4 — which
+  # breaks every game project here. Anchor to 3.x-stable tags so a
+  # hypothetical 3.6.x patch stays visible while 4.x stays invisible.
+  livecheck do
+    url :url
+    strategy :github_releases
+    regex(/^(3(?:\.\d+)+)-stable$/i)
+  end
+
+  # The runtime CLI (`ari-flash-launcher <game>`) ships with ari's godot3
+  # distro, so it arrives transitively with every game install.
   depends_on formula: "arisweedler/flash/ari-flash-launcher"
   depends_on :macos
 
@@ -27,6 +39,9 @@ cask "godot3" do
                    print_stderr: true
   end
 
+  # NOTE: "Application Support/Godot" holds editor config AND app_userdata
+  # save data for EVERY Godot game in this tap (user:// is keyed by each
+  # project's config/name). Zapping godot3 deletes all Godot game saves.
   zap trash: [
     "~/Library/Application Support/Godot",
     "~/Library/Caches/Godot",

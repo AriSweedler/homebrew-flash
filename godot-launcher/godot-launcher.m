@@ -33,6 +33,7 @@ static NSString *findGodot(void) {
     return nil;
 }
 
+// Duplicated in {launcher,godot-launcher}.m by design — each dir ships standalone in its release asset; keep in sync.
 static void fail(NSString *title, NSString *msg) {
     fprintf(stderr, "%s: %s\n", title.UTF8String, msg.UTF8String);
     if (!getenv("ARI_FLASH_NO_DIALOG")) {
@@ -78,15 +79,39 @@ int main(void) {
                      [NSString stringWithFormat:@"%@ -> %@: %@", src, projectDir,
                                                 err.localizedDescription ?: @"unknown error"]);
             }
-            // Headless one-time import of the project's assets.
-            NSString *cmd = [NSString stringWithFormat:
-                @"'%@' --no-window --editor --quit --path '%@' >/dev/null 2>&1",
-                godot, projectDir];
-            int rc = system(cmd.UTF8String);
-            if (rc != 0) {
-                fprintf(stderr, "godot-launcher: headless import exited %d (continuing)\n", rc);
+            // Headless one-time import of the project's assets. Godot 3's
+            // headless import exits nonzero spuriously, so we continue and
+            // write the marker anyway — the tradeoff is that a genuinely
+            // failed import is never retried until `brew uninstall --zap`.
+            NSTask *import = [NSTask new];
+            import.executableURL = [NSURL fileURLWithPath:godot];
+            import.arguments = @[ @"--no-window", @"--editor", @"--quit", @"--path", projectDir ];
+            import.standardOutput = [NSFileHandle fileHandleWithNullDevice];
+            import.standardError = [NSFileHandle fileHandleWithNullDevice];
+            NSError *importErr = nil;
+            if ([import launchAndReturnError:&importErr]) {
+                [import waitUntilExit];
+                if (import.terminationStatus != 0) {
+                    fprintf(stderr, "godot-launcher: headless import exited %d (continuing)\n",
+                            (int)import.terminationStatus);
+                }
+            } else {
+                fprintf(stderr, "godot-launcher: headless import failed to launch: %s (continuing)\n",
+                        importErr.localizedDescription.UTF8String ?: "unknown error");
             }
             [@"" writeToFile:importedMarker atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+        }
+
+        // Prune staging copies left by older versions. These per-version dirs
+        // under <Application Support>/<bundle id>/ are launcher-owned (Godot
+        // user:// data lives under Application Support/Godot/app_userdata and
+        // is untouched). Runs only after a successful stage + marker write, so
+        // a failed stage never deletes the last working copy.
+        NSString *versionsRoot = [appSupport stringByAppendingPathComponent:bundleId];
+        for (NSString *entry in [fm contentsOfDirectoryAtPath:versionsRoot error:NULL]) {
+            if (![entry isEqualToString:version]) {
+                [fm removeItemAtPath:[versionsRoot stringByAppendingPathComponent:entry] error:NULL];
+            }
         }
 
         char *const args[] = { (char *)godot.fileSystemRepresentation,

@@ -19,6 +19,14 @@ cask "slime-soccer" do
   desc "MIT remake of the classic Java-applet Slime Soccer (hectorbennett, Godot)"
   homepage "https://github.com/hectorbennett/slime-soccer"
 
+  # All the tap's games share one GitHub repo; scan all releases and anchor
+  # to this cask's own tag prefix (see the template's livecheck comment).
+  livecheck do
+    url :url
+    strategy :github_releases
+    regex(/^slime-soccer-v(\d+(?:\.\d+)+)$/i)
+  end
+
   depends_on cask: "arisweedler/flash/godot3"
   depends_on :macos
 
@@ -44,7 +52,11 @@ cask "slime-soccer" do
 
   zap trash: [
     # The launcher's writable project copy (per-version) and Godot's per-game
-    # user:// data (keyed by the project's config/name).
+    # user:// data (keyed by the project's config/name). Known limitation:
+    # the launcher stages one copy per app version under
+    # "~/Library/Application Support/com.arisweedler.flash.slime-soccer/<version>/",
+    # and old version dirs persist across upgrades until this zap runs (or
+    # until the launcher-side prune fix ships in a future release).
     "~/Library/Application Support/com.arisweedler.flash.slime-soccer",
     "~/Library/Application Support/Godot/app_userdata/Slime Soccer",
     "~/Library/Saved Application State/com.arisweedler.flash.slime-soccer.savedState",

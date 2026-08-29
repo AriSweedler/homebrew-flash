@@ -5,6 +5,8 @@
 //   -framework Cocoa -framework WebKit -o web-launcher web-launcher.m
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 @interface WrapDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property(strong) NSWindow *window;
@@ -21,13 +23,20 @@
     NSString *payloadDir = [bundle.resourcePath stringByAppendingPathComponent:payload];
     NSString *index = [payloadDir stringByAppendingPathComponent:@"index.html"];
     if (![[NSFileManager defaultManager] fileExistsAtPath:index]) {
-        NSAlert *a = [NSAlert new];
-        a.messageText = @"Game files not found";
-        a.informativeText = [NSString stringWithFormat:
+        // Mirror the fail() semantics of the exec-style launchers: always log
+        // to stderr, dialog only when interactive, and exit nonzero so
+        // headless/CI checks (ARI_FLASH_NO_DIALOG=1) see a real failure.
+        NSString *title = @"Game files not found";
+        NSString *msg = [NSString stringWithFormat:
             @"Missing %@. Reinstall with: brew reinstall <game>", index];
-        [a runModal];
-        [NSApp terminate:nil];
-        return;
+        fprintf(stderr, "%s: %s\n", title.UTF8String, msg.UTF8String);
+        if (!getenv("ARI_FLASH_NO_DIALOG")) {
+            NSAlert *a = [NSAlert new];
+            a.messageText = title;
+            a.informativeText = msg;
+            [a runModal];
+        }
+        exit(1);
     }
 
     NSRect frame = NSMakeRect(0, 0, w.doubleValue, h.doubleValue);

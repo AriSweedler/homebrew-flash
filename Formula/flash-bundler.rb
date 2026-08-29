@@ -21,5 +21,11 @@ class FlashBundler < Formula
 
   test do
     assert_match "flash-bundler", shell_output("#{bin}/flash-bundler --help")
+    # The inreplace above and the pkgshare launcher are the formula's whole
+    # reason to exist — fail if the marked line stops matching or the
+    # prebuilt launcher Mach-O stops shipping.
+    launcher = (bin/"flash-bundler").read[/^DEFAULT_LAUNCHER="([^"]+)"/, 1]
+    refute_nil launcher
+    assert_path_exists Pathname(launcher)
   end
 end

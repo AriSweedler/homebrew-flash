@@ -1,8 +1,9 @@
 # homebrew-flash
 
-Ari's Homebrew tap for classic Flash games on macOS. Each game installs as a
-real, signed `.app` that opens in [Ruffle](https://ruffle.rs), plus a CLI to
-launch any installed game from the terminal.
+Ari's Homebrew tap for rescued classic games on macOS. Each game installs as a
+real, signed `.app` — Flash games open in [Ruffle](https://ruffle.rs), and a
+couple of non-Flash rescues ship with their own offline runtime — plus a CLI
+to launch any installed game from the terminal.
 
 ## Quickstart
 
@@ -25,8 +26,9 @@ That one install pulls everything: the game, Ari's distro of Ruffle, and the
 ## How it works
 
 A game cask downloads a pinned, flat tarball (the game's `.swf`, its icon, the
-bundler script, and a prebuilt universal launcher) from this repo's GitHub
-releases. At install time, on your machine, the bundler turns that into
+bundler script, and a prebuilt universal launcher; non-Flash games swap the
+swf for a payload directory and flash-bundler for wrap-bundler — see below)
+from this repo's GitHub releases. At install time, on your machine, the bundler turns that into
 `<Game>.app`: it generates the `.icns` from the icon, writes the Info.plist,
 drops in the launcher binary, strips Homebrew's quarantine attributes, and
 ad-hoc code-signs the bundle. Homebrew then moves the finished app to
@@ -52,7 +54,7 @@ ari-flash-launcher list-upstream    # everything the tap offers, straight from
                                     # ones you already have
 ```
 
-The installed list is read from the apps themselves (flash-bundler bakes the
+The installed list is read from the apps themselves (the bundlers bake the
 version, update date, and description into each Info.plist), so it works
 offline and stays honest no matter how an app arrived or left.
 
@@ -87,6 +89,17 @@ offline and stays honest no matter how an app arrived or left.
 4. Paste the printed `sha256 "..."` line into the cask, commit, push.
 5. Run the [TESTING.md](TESTING.md) checklist on the test machine.
 
+Steps 1 and 3–4 are automated: with the cask staged (sha256 placeholder
+`REPLACE_AT_RELEASE`) and `games/<slug>/icon.png` in place, run
+`scripts/finish-game-release <slug> ~/Downloads/<game>.swf`. It stages the
+swf, parses the swf stage size and rewrites the cask's `--window` line to 2x,
+validation-builds the app locally, commits, tags `<slug>-v<version>`, cuts
+the release, and pastes the sha256 back into the cask.
+
+Note the checklist as written is Flash-only: non-Flash games pass a different
+path list to cut-release — `bin/wrap-bundler <stub-dir>/<stub> games/<slug>`
+per the url comment in each slime cask.
+
 ## Non-Flash games (wrap-bundler)
 
 Not everything worth rescuing was Flash. The tap has a second, parallel
@@ -112,6 +125,9 @@ Everything is removable, including saves:
 brew uninstall arisweedler/flash/bubble-trouble        # removes the .app
 brew uninstall --zap arisweedler/flash/bubble-trouble  # + that game's Ruffle save data
 brew uninstall --zap arisweedler/flash/ruffle          # + Ruffle and ALL games' saves/config
+brew uninstall --zap arisweedler/flash/slime-volleyball  # + its WebKit storage/caches
+brew uninstall --zap arisweedler/flash/slime-soccer      # + its project copy and Godot user data
+brew uninstall --zap arisweedler/flash/godot3            # + Godot 3 runtime and its dirs
 brew autoremove                                        # removes ari-flash-launcher once
                                                        # nothing depends on it
 ```
@@ -119,6 +135,12 @@ brew autoremove                                        # removes ari-flash-launc
 Zapping `ruffle` deletes `~/Library/Application Support/ruffle`, which holds
 the save data (Flash SharedObjects) for every game — zap games first if you
 only want to remove one.
+
+Likewise, zapping `godot3` deletes `~/Library/Application Support/Godot` and
+`~/Library/Caches/Godot` — Godot keys per-app `user://` data under that one
+directory, so this removes save data for EVERY Godot app on the machine,
+including projects from a personal Godot install. Zap the games first; skip
+the godot3 zap if you use Godot yourself.
 
 If homebrew-cask ever ships its own `ruffle` token, use the tap-qualified
 names: `brew install arisweedler/flash/ruffle`, etc.
@@ -131,10 +153,17 @@ No install testing happens on the dev machine. Acceptance is
 ## Repo layout
 
 ```
-Casks/            ruffle.rb + one cask per game (bubble-trouble.rb is the template)
+Casks/            runtime casks (ruffle.rb, godot3.rb) + one cask per game
+                  (bubble-trouble.rb is the commented template for Flash games)
 Formula/          ari-flash-launcher.rb (runtime CLI), flash-bundler.rb (authoring CLI)
-bin/              the two CLI scripts, as shipped in release assets
-launcher/         launcher.m + prebuilt universal binary embedded in every game app
-games/<slug>/     game.swf + icon.png, hosted in-repo
-scripts/          cut-release (release-asset helper)
+bin/              the three CLI scripts (ari-flash-launcher, flash-bundler,
+                  wrap-bundler), as shipped in release assets
+completions/      zsh + bash completions, installed by the ari-flash-launcher formula
+launcher/         launcher.m + prebuilt universal binary embedded in every Flash game app
+web-launcher/     WKWebView stub embedded in offline web-build games (slime-volleyball)
+godot-launcher/   stub that runs a Godot 3 project via the godot3 cask (slime-soccer)
+games/<slug>/     game payload, hosted in-repo: game.swf + icon.png for Flash games;
+                  a web/ or project/ dir + icon.png for wrapped games
+scripts/          cut-release (release-asset helper), finish-game-release
+                  (one command: staged swf -> tagged, released, sha-filled cask)
 ```

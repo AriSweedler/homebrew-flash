@@ -25,7 +25,9 @@ set -euo pipefail
 log() { printf 'finish-game-release: %s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
-[[ $# -eq 2 ]] || { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+# Usage text = this file's leading comment block (stops at the first
+# non-comment line, so it never drifts when the header grows or shrinks).
+[[ $# -eq 2 ]] || { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,""); print}' "$0" >&2; exit 2; }
 slug="$1" swf_src="$2"
 
 cd "$(git rev-parse --show-toplevel)"
@@ -41,6 +43,7 @@ gamedir="games/${slug}"
 version=$(awk -F'"' '/^  version "/ { print $2; exit }' "$cask")
 [[ -n "$version" ]] || die "could not read version from $cask"
 name=$(awk -F'"' '/^  name "/ { print $2; exit }' "$cask")
+[[ -n "$name" ]] || die "could not read name from $cask"
 
 log "staging swf | slug='$slug' version='$version'"
 cp "$swf_src" "$gamedir/game.swf"
@@ -101,7 +104,7 @@ git push origin main "$tag"
 GH_TOKEN="$(env -u GITHUB_TOKEN gh auth token --user AriSweedler)" \
   ./scripts/cut-release "$tag" bin/flash-bundler launcher/launcher "$gamedir" \
   | tee "$tmp/cut.out" >&2
-sha=$(awk -F'"' '/^  sha256 "/ { print $2; exit }' "$tmp/cut.out")
+sha=$(awk -F= '/^sha256=/{print $2; exit}' "$tmp/cut.out")
 [[ ${#sha} -eq 64 ]] || die "could not extract sha256 from cut-release output"
 
 python3 - "$cask" "$sha" <<'PYEOF'

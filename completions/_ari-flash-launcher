@@ -2,6 +2,9 @@
 # zsh completion for ari-flash-launcher. Installed by the ari-flash-launcher
 # formula into brew's site-functions. Game slugs are completed live from
 # `list-installed --porcelain` (slug<TAB>name<TAB>version<TAB>updated<TAB>desc).
+#
+# NOTE: the command list below is mirrored in bin/ari-flash-launcher (main()
+# dispatch) and completions/ari-flash-launcher.bash — update all three together.
 
 _ari_flash_launcher_games() {
   local -a games

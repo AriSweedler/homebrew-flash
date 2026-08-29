@@ -26,6 +26,7 @@ static NSString *findRuffle(void) {
     return nil;
 }
 
+// Duplicated in {launcher,godot-launcher}.m by design — each dir ships standalone in its release asset; keep in sync.
 static void fail(NSString *title, NSString *msg) {
     fprintf(stderr, "%s: %s\n", title.UTF8String, msg.UTF8String);
     if (!getenv("ARI_FLASH_NO_DIALOG")) {
