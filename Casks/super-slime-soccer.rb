@@ -10,7 +10,7 @@
 # do not exist inside the offline app; local 1P/2P play is intact.
 cask "super-slime-soccer" do
   version "1.1.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "472d2cf40771188d4cc9d13995eb233f1242e2749e430271f56fdf4d6dce8a0d"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/wrap-bundler, bin/site-vendor, web-launcher/web-launcher,
