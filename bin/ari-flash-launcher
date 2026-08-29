@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 # ari-flash-launcher — launch and list brew-installed Flash games.
 #
 # The installed .apps ARE the registry: games are discovered by scanning
@@ -6,95 +6,140 @@
 # com.arisweedler.flash. (deterministic plutil scan; mdfind is not used because
 # Spotlight lags fresh installs and can be disabled). Version, last-updated
 # date, and description are baked into each app's Info.plist by flash-bundler.
+#
+# zsh on purpose (macOS-only tool; bash version varies across machines).
+# Logging helpers are inlined rather than sourced: this script is distributed
+# standalone via the arisweedler/flash tap, so no shared lib is available.
 set -euo pipefail
 
-ID_PREFIX="com.arisweedler.flash."
-APP_DIRS="${ARI_FLASH_APP_DIRS:-/Applications:${HOME}/Applications}"
-TAP_REPO="AriSweedler/homebrew-flash"
+readonly VERSION="1.2.0"
+readonly ID_PREFIX="com.arisweedler.flash."
+readonly APP_DIRS="${ARI_FLASH_APP_DIRS:-/Applications:${HOME}/Applications}"
+readonly TAP_REPO="AriSweedler/homebrew-flash"
 
-usage() {
+# Colors: only when stderr is a tty.
+if [[ -t 2 ]]; then
+  readonly c_bold=$'\e[1m' c_green=$'\e[32m' c_red=$'\e[31m' c_rst=$'\e[0m'
+else
+  readonly c_bold="" c_green="" c_red="" c_rst=""
+fi
+log::info() { print -u2 -- "${c_green}[INFO]${c_rst} $*"; }
+log::err()  { print -u2 -- "${c_red}[ERROR]${c_rst} $*"; }
+
+#######################################
+# Top-level help.
+help() {
   cat <<EOF
-Usage: ari-flash-launcher <command|game|path/to.swf>
+${c_green}ari-flash-launcher${c_rst} ${VERSION} — launch and list brew-installed Flash games
 
-Commands:
-  list-installed   List installed games: version, last updated, description.
+${c_bold}Usage:${c_rst}
+  ari-flash-launcher <command> [options]
+  ari-flash-launcher <game>|<path/to.swf>
+
+${c_bold}Commands:${c_rst}
+  list-installed   Installed games: version, last updated, description.
   list, ls         Aliases of list-installed (also the default with no args).
-  list-upstream    List every game the tap offers (straight from GitHub —
-                   no brew needed), marking which are already installed.
-  --help, -h       This help.
+  list-upstream    Every game the tap offers, straight from GitHub (no brew
+                   needed); '*' marks the ones already installed.
+  launch <game>    Open an installed game (bare '<game>' works too).
+  help             This help.
+  version          Print the version.
 
-Anything else:
+Every command also accepts -h/--help for command-specific help.
+
+${c_bold}Anything else:${c_rst}
   <game>           Slug or display name of an installed game
-                   (case-insensitive), e.g. 'bubble-trouble' or
-                   'Bubble Trouble'. Opens its .app.
+                   (case-insensitive), e.g. 'bubble-trouble'. Opens its .app.
   <path/to.swf>    Open an arbitrary SWF file directly in Ruffle.
 
-Games are discovered by scanning for apps with a ${ID_PREFIX}* bundle
-identifier in: /Applications and ~/Applications.
-
-Environment:
-  ARI_FLASH_APP_DIRS   Colon-separated dirs to scan instead of the default.
+${c_bold}Environment:${c_rst}
+  ARI_FLASH_APP_DIRS   Colon-separated dirs to scan instead of
+                       /Applications:~/Applications.
   ARI_FLASH_DRY_RUN    If set, print the 'open' command instead of running it.
 EOF
 }
 
-plist_get() { plutil -extract "$2" raw -o - "$1" 2>/dev/null || printf ''; }
-
-# One line per installed game:
+#######################################
+# Emit one line per installed game to stdout:
 # "<slug>\t<name>\t<version>\t<updated>\t<desc>\t<app path>"
+# Globals: APP_DIRS, ID_PREFIX
 scan_games() {
   local dir app plist id name version updated desc
-  local IFS=':'
-  for dir in $APP_DIRS; do
-    [ -d "$dir" ] || continue
-    for app in "$dir"/*.app; do
-      plist="$app/Contents/Info.plist"
-      [ -f "$plist" ] || continue
-      id=$(plist_get "$plist" CFBundleIdentifier)
-      case "$id" in
-        "$ID_PREFIX"*) ;;
-        *) continue ;;
-      esac
-      name=$(plist_get "$plist" CFBundleName)
-      [ -n "$name" ] || name=$(basename "$app" .app)
-      version=$(plist_get "$plist" CFBundleShortVersionString)
-      updated=$(plist_get "$plist" FlashGameUpdated)
-      desc=$(plist_get "$plist" FlashGameDescription)
+  for dir in "${(@s/:/)APP_DIRS}"; do
+    [[ -d "${dir}" ]] || continue
+    for app in "${dir}"/*.app(N); do
+      plist="${app}/Contents/Info.plist"
+      [[ -f "${plist}" ]] || continue
+      id="$(plutil -extract CFBundleIdentifier raw -o - "${plist}" 2>/dev/null)" || continue
+      [[ "${id}" == "${ID_PREFIX}"* ]] || continue
+      name="$(plutil -extract CFBundleName raw -o - "${plist}" 2>/dev/null)" || name=""
+      [[ -n "${name}" ]] || name="$(basename "${app}" .app)"
+      version="$(plutil -extract CFBundleShortVersionString raw -o - "${plist}" 2>/dev/null)" || version=""
+      updated="$(plutil -extract FlashGameUpdated raw -o - "${plist}" 2>/dev/null)" || updated=""
+      desc="$(plutil -extract FlashGameDescription raw -o - "${plist}" 2>/dev/null)" || desc=""
       printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-        "${id#"$ID_PREFIX"}" "$name" "${version:--}" "${updated:--}" \
-        "${desc:--}" "$app"
+        "${id#"${ID_PREFIX}"}" "${name}" "${version:--}" "${updated:--}" \
+        "${desc:--}" "${app}"
     done
   done
 }
 
-list_installed() {
+#######################################
+# list-installed: table of installed games from their Info.plists (offline).
+# Arguments: optional -h/--help
+cmd_list_installed() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<EOF
+${c_green}ari-flash-launcher list-installed${c_rst} (aliases: list, ls)
+
+Lists installed games with version, the date the game was last updated in the
+tap, and a one-line description. Read from the installed apps' Info.plists —
+works offline and stays honest no matter how an app arrived or left.
+EOF
+    return 0
+  fi
   local games
-  games=$(scan_games)
-  if [ -z "$games" ]; then
-    echo "No flash games installed. See what's available with:"
-    echo "  ari-flash-launcher list-upstream"
-    return
+  games="$(scan_games)"
+  if [[ -z "${games}" ]]; then
+    print -- "No flash games installed. See what's available with:"
+    print -- "  ari-flash-launcher list-upstream"
+    return 0
   fi
   {
     printf 'SLUG\tVERSION\tUPDATED\tDESCRIPTION\n'
-    printf '%s\n' "$games" | sort | while IFS=$'\t' read -r slug _ version updated desc _; do
-      printf '%s\t%s\t%s\t%s\n' "$slug" "$version" "$updated" "$desc"
+    print -r -- "${games}" | sort | while IFS=$'\t' read -r slug _ version updated desc _; do
+      printf '%s\t%s\t%s\t%s\n' "${slug}" "${version}" "${updated}" "${desc}"
     done
   } | column -t -s $'\t'
 }
 
-# Everything the tap offers, straight from GitHub releases + cask files.
-# Needs: jq (a formula dependency), curl, network.
-list_upstream() {
-  local releases installed slug
-  releases=$(curl -fsSL "https://api.github.com/repos/${TAP_REPO}/releases?per_page=100") \
-    || { echo "error: could not reach GitHub (network?)" >&2; exit 1; }
-  installed=$(scan_games | cut -f1)
+#######################################
+# list-upstream: everything the tap offers, from GitHub releases + cask descs.
+# Needs jq (formula dependency), curl, network. All curls wall-clock bounded.
+# Arguments: optional -h/--help
+cmd_list_upstream() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<EOF
+${c_green}ari-flash-launcher list-upstream${c_rst}
+
+Lists every game the arisweedler/flash tap offers — straight from GitHub
+releases and cask files, no brew needed. '*' marks games already installed.
+Requires network access.
+EOF
+    return 0
+  fi
+  local releases installed
+  if ! releases="$(curl -fsSL --connect-timeout 5 --max-time 30 \
+      "https://api.github.com/repos/${TAP_REPO}/releases?per_page=100")"; then
+    log::err "could not reach GitHub | url='api.github.com/repos/${TAP_REPO}/releases' hint='network?'"
+    return 1
+  fi
+  installed="$(scan_games | cut -f1)"
   {
     printf ' \tSLUG\tVERSION\tUPDATED\tDESCRIPTION\n'
     # tag "<slug>-v<version>" -> "<slug>\t<version>\t<date>"; tools-* excluded.
     # Releases are newest-first; keep only the newest per slug.
-    printf '%s' "$releases" \
+    print -r -- "${releases}" \
       | jq -r '.[] | [.tag_name, (.published_at[:10])] | @tsv' \
       | awk -F'\t' '$1 !~ /^tools-/ && match($1, /-v[0-9]/) {
           slug = substr($1, 1, RSTART - 1)
@@ -103,58 +148,85 @@ list_upstream() {
         }' \
       | sort \
       | while IFS=$'\t' read -r slug version date; do
-          local mark="-" desc
-          printf '%s\n' "$installed" | grep -qx "$slug" && mark="*"
-          desc=$(curl -fsSL "https://raw.githubusercontent.com/${TAP_REPO}/main/Casks/${slug}.rb" 2>/dev/null \
-            | sed -n 's/^  desc "\(.*\)"$/\1/p' | head -1)
-          printf '%s\t%s\t%s\t%s\t%s\n' "$mark" "$slug" "$version" "$date" "${desc:--}"
+          local mark="-" desc=""
+          if print -r -- "${installed}" | grep -qx "${slug}"; then mark="*"; fi
+          desc="$(curl -fsSL --connect-timeout 5 --max-time 15 \
+              "https://raw.githubusercontent.com/${TAP_REPO}/main/Casks/${slug}.rb" 2>/dev/null \
+            | awk -F'"' '/^  desc "/ { print $2; exit }')" || desc=""
+          printf '%s\t%s\t%s\t%s\t%s\n' "${mark}" "${slug}" "${version}" "${date}" "${desc:--}"
         done
   } | column -t -s $'\t'
-  echo
-  echo "* = installed. Install with: brew install arisweedler/flash/<slug>"
+  print
+  print -- "* = installed. Install with: brew install arisweedler/flash/<slug>"
 }
 
-lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
-
+#######################################
+# Print the 'open' command under ARI_FLASH_DRY_RUN, else run it.
 do_open() {
-  if [ -n "${ARI_FLASH_DRY_RUN:-}" ]; then
+  if [[ -n "${ARI_FLASH_DRY_RUN:-}" ]]; then
     printf 'DRY-RUN: open'; printf ' %q' "$@"; printf '\n'
-  else
-    open "$@"
+    return 0
   fi
+  open "$@"
 }
 
-main() {
-  local arg="${1:-}"
-  case "$arg" in
-    ""|list|ls|list-installed|--list) list_installed; exit 0 ;;
-    list-upstream) list_upstream; exit 0 ;;
-    --help|-h) usage; exit 0 ;;
-  esac
+#######################################
+# launch: open an installed game by slug/name, or a raw .swf in Ruffle.
+# Arguments: <game>|<path/to.swf>, or -h/--help
+cmd_launch() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || -z "${1:-}" ]]; then
+    cat <<EOF
+${c_green}ari-flash-launcher launch${c_rst} <game>|<path/to.swf>
 
-  # A real file → hand it to Ruffle directly.
-  if [ -f "$arg" ]; then
+Opens an installed game by slug or display name (case-insensitive), or hands
+an arbitrary .swf file to Ruffle. The bare form without the 'launch' word
+does the same thing: ari-flash-launcher bubble-trouble
+EOF
+    return 0
+  fi
+  local arg="${1}"
+
+  if [[ -f "${arg}" ]]; then
     local abs
-    abs="$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")"
-    do_open -a Ruffle --args "$abs"
-    exit 0
+    abs="$(cd "$(dirname "${arg}")" && pwd)/$(basename "${arg}")"
+    log::info "opening raw swf in Ruffle | swf='${abs}'"
+    do_open -a Ruffle --args "${abs}"
+    return 0
   fi
 
-  # Otherwise match an installed game by slug or display name.
-  local want slug name app
-  want=$(lower "$arg")
+  local want="${arg:l}" slug name app
   while IFS=$'\t' read -r slug name _ _ _ app; do
-    if [ "$(lower "$slug")" = "$want" ] || [ "$(lower "$name")" = "$want" ]; then
-      do_open "$app"
-      exit 0
+    if [[ "${slug:l}" == "${want}" || "${name:l}" == "${want}" ]]; then
+      log::info "launching | slug='${slug}' app='${app}'"
+      do_open "${app}"
+      return 0
     fi
   done <<EOF
 $(scan_games)
 EOF
 
-  echo "error: no installed game matches '$arg'" >&2
-  list_installed >&2
-  exit 1
+  log::err "no installed game matches | arg='${arg}' expected='an installed slug/name, or a .swf path'"
+  cmd_list_installed >&2
+  return 1
+}
+
+#######################################
+# Dispatch. Named commands first; anything else is treated as a game/swf.
+main() {
+  local cmd="${1:-list-installed}"
+  case "${cmd}" in
+    list|ls|list-installed|--list) (( $# )) && shift; cmd_list_installed "$@" ;;
+    list-upstream)                 shift; cmd_list_upstream "$@" ;;
+    launch)                        shift; cmd_launch "$@" ;;
+    help|--help|-h)                help ;;
+    version|--version|-V)          print -- "ari-flash-launcher ${VERSION}" ;;
+    -*)
+      log::err "unknown flag | flag='${cmd}' valid='list-installed, list-upstream, launch, help, version'"
+      help >&2
+      return 1
+      ;;
+    *)                             cmd_launch "$@" ;;
+  esac
 }
 
 main "$@"
