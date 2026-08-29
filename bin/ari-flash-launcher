@@ -220,6 +220,8 @@ EOF
 
 #######################################
 # Dispatch. Named commands first; anything else is treated as a game/swf.
+# NOTE: this command list is mirrored in completions/_ari-flash-launcher and
+# completions/ari-flash-launcher.bash — update all three together.
 main() {
   local cmd="${1:-list-installed}"
   case "${cmd}" in

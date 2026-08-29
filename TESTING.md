@@ -10,8 +10,9 @@ it back to the drawing board — do not hand-fix the test machine.
 - [ ] Machine has Homebrew installed and working: `brew --version`
 - [ ] Machine has NO prior state from this tap:
   ```sh
-  brew list --cask 2>/dev/null | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top' && echo "DIRTY" || echo "clean"
+  brew list --cask 2>/dev/null | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top|ari-flash|temurin' && echo "DIRTY" || echo "clean"
   ls /Applications | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top' && echo "DIRTY" || echo "clean"
+  ls "$(brew --prefix)/bin" 2>/dev/null | grep -Ei 'ari-flash' && echo "DIRTY" || echo "clean"
   brew untap arisweedler/flash 2>/dev/null; true
   ```
   If dirty, uninstall/zap leftovers first so this is a true fresh-install test.
@@ -47,11 +48,18 @@ it back to the drawing board — do not hand-fix the test machine.
 
 ## 2b. Install the wrapped games
 
-- [ ] `brew install arisweedler/flash/slime-volleyball`
-  - Success: exits 0; NO ruffle pulled; `/Applications/Slime Volleyball.app` exists.
-- [ ] `brew install arisweedler/flash/slime-soccer`
+- [ ] `brew install arisweedler/flash/slime-soccer` (the JAVA original)
+  - Success: pulls the `ari-flash-jre` cask automatically;
+    `$(brew --prefix)/bin/ari-flash-java` exists and `ari-flash-java -version`
+    reports Temurin 17; `/Applications/Slime Soccer.app` exists.
+- [ ] `brew install arisweedler/flash/slime-volleyball` (the JAVA original)
+  - Success: exits 0 (JRE already present); `/Applications/Slime Volleyball.app` exists.
+- [ ] `brew install arisweedler/flash/godot-slime-soccer` (godot trial variant)
   - Success: pulls the `godot3` cask automatically; `/Applications/Godot 3.app`
-    and `/Applications/Slime Soccer.app` exist.
+    and `/Applications/Godot Slime Soccer.app` exist.
+- [ ] `brew install arisweedler/flash/wip-slime-volleyball` — EXPECTED BROKEN
+      (blank canvas; upstream dist bug). Install must still succeed and the
+      .app must open a window; record what it shows.
 
 ## 3. Launch path A — the .app (double-click UX)
 
@@ -71,15 +79,25 @@ it back to the drawing board — do not hand-fix the test machine.
 
 ## 3b. Launch the wrapped games
 
-- [ ] Double-click `/Applications/Slime Volleyball.app` from Finder — it must
-      open its own window with no network (verify by toggling Wi-Fi off once).
-- [ ] Double-click `/Applications/Slime Soccer.app` from Finder. Its FIRST
+Java originals (deferred GUI checks from authoring — all four matter):
+- [ ] Double-click `/Applications/Slime Soccer.app` — window renders at 700x350;
+      dock shows the game name/icon (not a generic java cup); keyboard input
+      works; focus returns after cmd-tab away and back.
+- [ ] Double-click `/Applications/Slime Volleyball.app` — window at 600x350;
+      the clipped ground band at the bottom is INTENTIONAL (authentic embed
+      size; see games/slime-volleyball/PROVENANCE.md); two-player keys work.
+- [ ] Both run with Wi-Fi off (bytecode-audited: no network).
+- [ ] Quitting the window fully exits the process (no lingering java in
+      `ps -ax | grep ari-flash-java`).
+
+Godot trial variant:
+- [ ] Double-click `/Applications/Godot Slime Soccer.app`. Its FIRST
       launch must create
-      `~/Library/Application Support/com.arisweedler.flash.slime-soccer`
+      `~/Library/Application Support/com.arisweedler.flash.godot-slime-soccer`
       (the writable project copy) and
       `~/Library/Application Support/Godot/app_userdata/Slime Soccer`,
       and the installed .app must stay unmodified — record that
-      `find '/Applications/Slime Soccer.app' -newer /Applications -type f`
+      `find '/Applications/Godot Slime Soccer.app' -newer /Applications -type f`
       is empty.
 
 ## 4. Launch path B — the CLI
@@ -174,7 +192,7 @@ brew upgrade   arisweedler/flash/bubble-trouble    # version was bumped
 - [ ] Final sweep — expect NO hits:
   ```sh
   ls /Applications | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top'
-  brew list | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top|ari-flash'
+  brew list | grep -Ei 'ruffle|godot|bubble|slime|qwop|get.on.top|ari-flash|temurin'
   find ~/Library -maxdepth 3 \( -iname '*ruffle*' -o -iname '*godot*' -o -iname '*slime*' -o -iname '*arisweedler*' \) 2>/dev/null
   ```
   A hit on `godot` is expected if the test machine has a personal Godot

@@ -106,16 +106,23 @@ Not everything worth rescuing was Flash. The tap has a second, parallel
 pattern for directory-payload games, built by `bin/wrap-bundler` (same
 icns/plist/sign pipeline as flash-bundler, payload dir instead of a swf):
 
+- **Java applets** — the ORIGINAL applet bytecode, run unmodified by
+  `applet-harness/slime-harness.jar` (a minimal AppletStub/Frame host) on the
+  pinned notarized Temurin 17 JRE from the `ari-flash-jre` cask, exec'd by
+  `java-launcher` (the ruffle pattern; `-Xdock:` flags carry the game's dock
+  identity). The applet class rides in the payload as `game/applet.conf`.
+  Examples: `slime-soccer`, `slime-volleyball` — each payload dir carries a
+  PROVENANCE.md with sources, sha256s, and the freeware-redistribution note.
+- **Godot 3 projects** — run by `godot-launcher` via the pinned `godot3`
+  runtime cask. First launch copies the project to Application Support and
+  imports assets headlessly there; the signed app stays read-only.
+  Example: `godot-slime-soccer` (hectorbennett, MIT) — the remake variant,
+  kept installable until formally deprecated.
 - **Web builds** — wrapped in `web-launcher` (an offline WKWebView window; no
   network at play time, CDN scripts vendored). Self-contained, no runtime
-  cask. Example: `slime-volleyball` (mmkal/slimejs, MIT).
-- **Godot 3 projects** — run by `godot-launcher` via the pinned `godot3`
-  runtime cask (the ruffle pattern). First launch copies the project to
-  Application Support and imports assets headlessly there; the signed app
-  stays read-only. Example: `slime-soccer` (hectorbennett, MIT).
-
-The two slime games are TRIAL CANDIDATES installed side by side; after
-testing, one stays and the other gets deprecated.
+  cask. Example: `wip-slime-volleyball` (mmkal/slimejs, MIT) — BROKEN
+  upstream (its published dist has an empty games registry); kept only for
+  investigation.
 
 ## Uninstalling
 
@@ -125,9 +132,12 @@ Everything is removable, including saves:
 brew uninstall arisweedler/flash/bubble-trouble        # removes the .app
 brew uninstall --zap arisweedler/flash/bubble-trouble  # + that game's Ruffle save data
 brew uninstall --zap arisweedler/flash/ruffle          # + Ruffle and ALL games' saves/config
-brew uninstall --zap arisweedler/flash/slime-volleyball  # + its WebKit storage/caches
-brew uninstall --zap arisweedler/flash/slime-soccer      # + its project copy and Godot user data
-brew uninstall --zap arisweedler/flash/godot3            # + Godot 3 runtime and its dirs
+brew uninstall --zap arisweedler/flash/slime-soccer        # java original
+brew uninstall --zap arisweedler/flash/slime-volleyball    # java original
+brew uninstall --zap arisweedler/flash/godot-slime-soccer  # + its project copy and Godot user data
+brew uninstall --zap arisweedler/flash/wip-slime-volleyball # + its WebKit storage/caches
+brew uninstall --zap arisweedler/flash/godot3              # + Godot 3 runtime and its dirs
+brew uninstall --cask arisweedler/flash/ari-flash-jre      # the tap's pinned JRE
 brew autoremove                                        # removes ari-flash-launcher once
                                                        # nothing depends on it
 ```
@@ -153,17 +163,20 @@ No install testing happens on the dev machine. Acceptance is
 ## Repo layout
 
 ```
-Casks/            runtime casks (ruffle.rb, godot3.rb) + one cask per game
-                  (bubble-trouble.rb is the commented template for Flash games)
+Casks/            runtime casks (ruffle.rb, godot3.rb, ari-flash-jre.rb) + one cask
+                  per game (bubble-trouble.rb is the commented template for Flash games)
 Formula/          ari-flash-launcher.rb (runtime CLI), flash-bundler.rb (authoring CLI)
 bin/              the three CLI scripts (ari-flash-launcher, flash-bundler,
                   wrap-bundler), as shipped in release assets
 completions/      zsh + bash completions, installed by the ari-flash-launcher formula
 launcher/         launcher.m + prebuilt universal binary embedded in every Flash game app
-web-launcher/     WKWebView stub embedded in offline web-build games (slime-volleyball)
-godot-launcher/   stub that runs a Godot 3 project via the godot3 cask (slime-soccer)
+web-launcher/     WKWebView stub embedded in offline web-build games (wip-slime-volleyball)
+godot-launcher/   stub that runs a Godot 3 project via the godot3 cask (godot-slime-soccer)
+java-launcher/    stub that execs the ari-flash-jre JRE with -Xdock identity (java applet games)
+applet-harness/   SlimeRunner.java + prebuilt slime-harness.jar (minimal AppletStub/Frame host)
 games/<slug>/     game payload, hosted in-repo: game.swf + icon.png for Flash games;
-                  a web/ or project/ dir + icon.png for wrapped games
+                  a web/, project/, or game/ (jar/class + applet.conf) dir + icon.png
+                  for wrapped games (java payloads add PROVENANCE.md)
 scripts/          cut-release (release-asset helper), finish-game-release
                   (one command: staged swf -> tagged, released, sha-filled cask)
 ```
