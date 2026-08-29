@@ -4,7 +4,7 @@ class AriFlashLauncher < Formula
   url "https://github.com/AriSweedler/homebrew-flash/releases/download/tools-v1.3.0/ari-flash-tools-1.3.0.tar.gz"
   # No version stanza: brew infers it from the asset filename. An explicit one
   # pinned at 1.0.0 masked upgrades for two releases — never reintroduce it.
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "3f4b238f19dfebc0725b409a948d7831e0a09a2ac9e548c98ec12f2932c2fe7b"
   license "MIT"
 
   depends_on "jq"
