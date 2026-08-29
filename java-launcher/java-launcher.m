@@ -121,6 +121,19 @@ int main(void) {
                 [argStrings addObject:[NSString stringWithFormat:@"-Xdock:icon=%@", icns]];
             }
         }
+        // 1999-era applets draw unbuffered via getGraphics(); the Metal
+        // java2d pipeline (default since JDK 17) stutters on that pattern.
+        // Default to the OpenGL pipeline; ARI_FLASH_JAVA_OPTS can override
+        // (later -D duplicates win), e.g. for A/B on the test machine:
+        //   ARI_FLASH_JAVA_OPTS="-Dsun.java2d.metal=true" <app>/Contents/MacOS/<Exe>
+        [argStrings addObject:@"-Dsun.java2d.metal=false"];
+        const char *extraOpts = getenv("ARI_FLASH_JAVA_OPTS");
+        if (extraOpts && *extraOpts) {
+            for (NSString *opt in [@(extraOpts) componentsSeparatedByCharactersInSet:
+                                       [NSCharacterSet whitespaceCharacterSet]]) {
+                if (opt.length) [argStrings addObject:opt];
+            }
+        }
         [argStrings addObjectsFromArray:@[ @"-cp", cp, @"SlimeRunner",
                                            @"--class", cls, @"--title", title ]];
         if (width.length && height.length) {

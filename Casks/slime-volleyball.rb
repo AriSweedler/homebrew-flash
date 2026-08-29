@@ -12,8 +12,8 @@
 # Provenance, controls, and the redistribution note live in
 # games/slime-volleyball/PROVENANCE.md.
 cask "slime-volleyball" do
-  version "2.1.0"
-  sha256 "3dd64b2862ae8f3a394c81ae8cee5366538b725e6eacf454d6cfc2c4448eb5a7"
+  version "2.1.1"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/wrap-bundler, java-launcher/java-launcher, games/slime-volleyball/.

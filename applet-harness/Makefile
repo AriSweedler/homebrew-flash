@@ -8,7 +8,7 @@ JAVAC ?= javac
 JAVA  ?= java
 JAR   ?= jar
 
-GAMES = ../games/slime-soccer-java/game ../games/slime-volleyball-java/game
+GAMES = ../games/slime-soccer/game ../games/slime-volleyball/game ../games/slime-volleyball-2p/game
 
 .PHONY: all verify sync clean
 
@@ -36,7 +36,7 @@ verify: slime-harness.jar
 	  echo "$$dir: $$out"; \
 	done
 
-# Copy the built jar into both game payloads (the release tarballs ship the
+# Copy the built jar into every game payload (the release tarballs ship the
 # payload dirs, not applet-harness/).
 sync: slime-harness.jar
 	@for dir in $(GAMES); do \

@@ -96,6 +96,19 @@ Java originals (deferred GUI checks from authoring — all four matter):
       gracefully).
 - [ ] Quitting the window fully exits the process (no lingering java in
       `ps -ax | grep ari-flash-java`).
+- [ ] Keyboard regression (fixed in soccer/volleyball 2.1.1, 2p 1.0.1): keys
+      must work IMMEDIATELY after launch and again after clicking the window
+      — the harness now forwards frame-level key events to the applet, so
+      focus placement cannot swallow input.
+- [ ] Lag A/B (the JVM now defaults to the OpenGL java2d pipeline;
+      JDK 17's Metal default stuttered on these unbuffered 1999 renderers).
+      If anything still feels laggy, compare from a terminal:
+      ```sh
+      "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"          # OpenGL (default)
+      ARI_FLASH_JAVA_OPTS="-Dsun.java2d.metal=true" \
+        "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"        # Metal
+      ```
+      Record which is smoother; ARI_FLASH_JAVA_OPTS takes arbitrary JVM flags.
 
 Godot trial variant:
 - [ ] Double-click `/Applications/Godot Slime Soccer.app`. Its FIRST

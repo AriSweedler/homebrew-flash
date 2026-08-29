@@ -17,6 +17,8 @@ import java.awt.Frame;
 import java.awt.Image;
 import java.awt.Insets;
 import java.awt.Toolkit;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.InputStream;
@@ -90,6 +92,27 @@ public final class SlimeRunner implements AppletStub, AppletContext {
             @Override public void windowActivated(WindowEvent e) {
                 applet.requestFocus();
             }
+        });
+
+        // Focus-independent keyboard delivery. Empty AWT Panels often lose
+        // the requestFocus race on modern macOS, leaving the Frame as focus
+        // owner — and this harness's WindowAdapter has already flipped the
+        // Frame to 1.1-style dispatch, so keys would be silently swallowed
+        // there. Retarget every frame-level key event at the applet:
+        // dispatchEvent runs the JDK's own new->old conversion, so JDK-1.0
+        // games (handleEvent/keyDown, arrows as KEY_ACTION) and 1.1-listener
+        // games both receive it. Listeners go on the FRAME only — adding any
+        // to the applet would kill its old-model delivery.
+        frame.setFocusTraversalKeysEnabled(false);
+        frame.addKeyListener(new KeyAdapter() {
+            private void retarget(KeyEvent e) {
+                applet.dispatchEvent(new KeyEvent(applet, e.getID(), e.getWhen(),
+                        e.getModifiers(), e.getKeyCode(), e.getKeyChar(), e.getKeyLocation()));
+                e.consume();
+            }
+            @Override public void keyPressed(KeyEvent e)  { retarget(e); }
+            @Override public void keyReleased(KeyEvent e) { retarget(e); }
+            @Override public void keyTyped(KeyEvent e)    { retarget(e); }
         });
 
         applet.init();
