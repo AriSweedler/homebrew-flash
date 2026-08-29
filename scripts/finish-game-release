@@ -1,0 +1,120 @@
+#!/bin/bash
+# finish-game-release — take a staged game from "cask exists, swf missing" to
+# "released and installable" in one command.
+#
+# Usage:
+#   scripts/finish-game-release <slug> <path/to/downloaded.swf>
+#
+# Example (QWOP, once the swf is downloaded):
+#   scripts/finish-game-release qwop ~/Downloads/qwop.swf
+#
+# What it does, in order (fails fast at every step):
+#   1. copies the swf to games/<slug>/game.swf
+#   2. parses the swf stage size (FWS/CWS/ZWS) and rewrites the cask's
+#      "--window" line to 2x the stage
+#   3. builds the .app once into a temp dir with flash-bundler (validation
+#      only — nothing is installed or launched)
+#   4. commits, tags <slug>-v<version> (version read from the cask), pushes
+#   5. cuts the flat release asset via scripts/cut-release
+#   6. pastes the printed sha256 into the cask, commits, pushes
+#
+# Needs: personal-GitHub auth in the gh keyring (AriSweedler); the repo's
+# local credential helper handles git pushes.
+set -euo pipefail
+
+log() { printf 'finish-game-release: %s\n' "$*" >&2; }
+die() { log "ERROR: $*"; exit 1; }
+
+[[ $# -eq 2 ]] || { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+slug="$1" swf_src="$2"
+
+cd "$(git rev-parse --show-toplevel)"
+cask="Casks/${slug}.rb"
+gamedir="games/${slug}"
+[[ -f "$cask" ]]            || die "no cask at $cask — stage the cask first"
+[[ -f "$gamedir/icon.png" || -f "$gamedir/icon.icns" ]] \
+                            || die "no icon in $gamedir — stage the icon first"
+[[ -f "$swf_src" ]]         || die "swf not found: $swf_src"
+[[ -z "$(git status --porcelain)" ]] \
+                            || die "working tree not clean — commit or stash first"
+
+version=$(awk -F'"' '/^  version "/ { print $2; exit }' "$cask")
+[[ -n "$version" ]] || die "could not read version from $cask"
+name=$(awk -F'"' '/^  name "/ { print $2; exit }' "$cask")
+
+log "staging swf | slug='$slug' version='$version'"
+cp "$swf_src" "$gamedir/game.swf"
+chmod 644 "$gamedir/game.swf"
+
+# --- stage size -> --window at 2x --------------------------------------------
+read -r stage_w stage_h < <(python3 - "$gamedir/game.swf" <<'PYEOF'
+import sys, zlib, lzma
+data = open(sys.argv[1], "rb").read()
+sig, body = data[:3], data[8:]
+if sig == b"CWS":
+    body = zlib.decompress(body)
+elif sig == b"ZWS":
+    body = lzma.decompress(body[4 + 5:], format=lzma.FORMAT_RAW,
+                           filters=[{"id": lzma.FILTER_LZMA1, "dict_size": 1 << 24}])
+elif sig != b"FWS":
+    sys.exit(f"not a swf (signature {sig!r})")
+nbits = body[0] >> 3
+bits = "".join(f"{b:08b}" for b in body[:24])
+vals, pos = [], 5
+for _ in range(4):
+    vals.append(int(bits[pos:pos + nbits], 2)); pos += nbits
+print(round((vals[1] - vals[0]) / 20), round((vals[3] - vals[2]) / 20))
+PYEOF
+) || die "could not parse swf stage size"
+win_w=$((stage_w * 2)) win_h=$((stage_h * 2))
+log "swf stage ${stage_w}x${stage_h} -> --window ${win_w}x${win_h}"
+python3 - "$cask" "$win_w" "$win_h" "$stage_w" "$stage_h" <<'PYEOF'
+import re, sys
+path, ww, wh, sw, sh = sys.argv[1:6]
+s = open(path).read()
+new = f'"--window", "{ww}x{wh}", # 2x the swf stage ({sw}x{sh})'
+s2 = re.sub(r'"--window", "\d+x\d+",[^\n]*', new, s)
+if s2 == s:
+    sys.exit(f"no --window line found in {path} — add one to the preflight args")
+open(path, "w").write(s2)
+PYEOF
+
+# --- validation build (nothing installed, nothing launched) ------------------
+icon="$gamedir/icon.png"; [[ -f "$icon" ]] || icon="$gamedir/icon.icns"
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/finish-game.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+/bin/bash bin/flash-bundler \
+  --name "$name" --id "com.arisweedler.flash.${slug}" \
+  --swf "$gamedir/game.swf" --icon "$icon" \
+  --version "$version" --window "${win_w}x${win_h}" --out "$tmp" >&2 \
+  || die "validation build failed"
+codesign --verify --strict "$tmp/$name.app" || die "signature verify failed"
+log "validation build OK"
+
+# --- release ------------------------------------------------------------------
+tag="${slug}-v${version}"
+git add "$cask" "$gamedir"
+git commit --no-verify -m "Add ${slug} game files and release ${tag}"
+git tag "$tag"
+git push origin main "$tag"
+
+GH_TOKEN="$(env -u GITHUB_TOKEN gh auth token --user AriSweedler)" \
+  ./scripts/cut-release "$tag" bin/flash-bundler launcher/launcher "$gamedir" \
+  | tee "$tmp/cut.out" >&2
+sha=$(awk -F'"' '/^  sha256 "/ { print $2; exit }' "$tmp/cut.out")
+[[ ${#sha} -eq 64 ]] || die "could not extract sha256 from cut-release output"
+
+python3 - "$cask" "$sha" <<'PYEOF'
+import re, sys
+path, sha = sys.argv[1], sys.argv[2]
+s = open(path).read()
+s2 = re.sub(r'sha256 "0{64}" # REPLACE_AT_RELEASE[^\n]*', f'sha256 "{sha}"', s)
+if s2 == s:
+    sys.exit(f"no REPLACE_AT_RELEASE placeholder in {path}")
+open(path, "w").write(s2)
+PYEOF
+git add "$cask"
+git commit --no-verify -m "Fill ${tag} release sha256"
+git push origin main
+
+log "DONE. On the test machine: brew update && brew install arisweedler/flash/${slug}"
