@@ -13,7 +13,7 @@
 # games/slime-volleyball/PROVENANCE.md.
 cask "slime-volleyball" do
   version "2.1.2"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "87737d31352c26a68d3ceae064f73b1b044d9ae03d02bed1c04dd2b8b7bf4497"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/wrap-bundler, java-launcher/java-launcher, games/slime-volleyball/.
