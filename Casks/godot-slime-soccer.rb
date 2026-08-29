@@ -11,7 +11,7 @@
 # Vendored from commit d9977cee1de6e6fe4d93be80b7145123b6c8a35c.
 cask "godot-slime-soccer" do
   version "1.1.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "ed8018d69290c0e003c40ed06c58599f44d1a7755984bd84f29bd448443c01d4"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/wrap-bundler, godot-launcher/godot-launcher, games/godot-slime-soccer/.
