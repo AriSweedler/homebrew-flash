@@ -87,6 +87,23 @@ offline and stays honest no matter how an app arrived or left.
 4. Paste the printed `sha256 "..."` line into the cask, commit, push.
 5. Run the [TESTING.md](TESTING.md) checklist on the test machine.
 
+## Non-Flash games (wrap-bundler)
+
+Not everything worth rescuing was Flash. The tap has a second, parallel
+pattern for directory-payload games, built by `bin/wrap-bundler` (same
+icns/plist/sign pipeline as flash-bundler, payload dir instead of a swf):
+
+- **Web builds** — wrapped in `web-launcher` (an offline WKWebView window; no
+  network at play time, CDN scripts vendored). Self-contained, no runtime
+  cask. Example: `slime-volleyball` (mmkal/slimejs, MIT).
+- **Godot 3 projects** — run by `godot-launcher` via the pinned `godot3`
+  runtime cask (the ruffle pattern). First launch copies the project to
+  Application Support and imports assets headlessly there; the signed app
+  stays read-only. Example: `slime-soccer` (hectorbennett, MIT).
+
+The two slime games are TRIAL CANDIDATES installed side by side; after
+testing, one stays and the other gets deprecated.
+
 ## Uninstalling
 
 Everything is removable, including saves:
