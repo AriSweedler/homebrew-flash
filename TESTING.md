@@ -59,6 +59,11 @@ it back to the drawing board — do not hand-fix the test machine.
 - [ ] `brew install arisweedler/flash/godot-slime-soccer` (godot trial variant)
   - Success: pulls the `godot3` cask automatically; `/Applications/Godot 3.app`
     and `/Applications/Godot Slime Soccer.app` exist.
+- [ ] `brew install arisweedler/flash/super-slime-soccer` (fetch-at-install)
+  - Needs NETWORK during install (preflight downloads the game from
+    superslimesoccer.io; the tap ships none of it). Success: exits 0;
+    `/Applications/Super Slime Soccer.app` exists. With Wi-Fi off the install
+    must FAIL LOUDLY naming the URL and the network hint.
 - [ ] `brew install arisweedler/flash/wip-slime-volleyball` — EXPECTED BROKEN
       (blank canvas; upstream dist bug). Install must still succeed and the
       .app must open a window; record what it shows.
@@ -109,6 +114,13 @@ Wrapped originals (deferred GUI checks from authoring — all four matter):
         "/Applications/Slime Volleyball.app/Contents/MacOS/SlimeVolleyball"        # OpenGL
       ```
       ARI_FLASH_JAVA_OPTS takes arbitrary JVM flags.
+
+Super Slime Soccer (offline HTML5):
+- [ ] Turn Wi-Fi OFF, then double-click `/Applications/Super Slime Soccer.app`
+      — the game must load and play fully offline (560x400 window). Arrows +
+      Space = player 1; WASD + 1 = player 2. Accounts/leaderboards from the
+      website do not exist in the app — expected.
+- [ ] Unlock progress survives quit/relaunch (WKWebView localStorage).
 
 Godot trial variant:
 - [ ] Double-click `/Applications/Godot Slime Soccer.app`. Its FIRST

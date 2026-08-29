@@ -1,8 +1,12 @@
 // web-launcher stub: a minimal "emulator" window for web games.
-// Two modes, decided by the payload dir Resources/<GamePayload default "web">:
+// Three modes, decided by marker files in Resources/<GamePayload default "web">:
+//   - serve.conf (optional `index=` line) -> serve the payload dir through an
+//     in-app WKURLSchemeHandler ("local web server", no sockets): needed by
+//     games that XHR/fetch their own files, which file:// forbids. Missing
+//     files get a clean 404 (some games probe for optional files).
 //   - site.conf with a `url=` line -> load that LIVE site (wrapper mode; used
 //     for games we may not redistribute — nothing of theirs ships in the app)
-//   - otherwise -> load the payload's index.html fully offline
+//   - otherwise -> load the payload's index.html fully offline via file://
 // Build: clang -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 \
 //   -framework Cocoa -framework WebKit -o web-launcher web-launcher.m
 #import <Cocoa/Cocoa.h>
@@ -10,8 +14,68 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// In-app static file server over a custom URL scheme. WKWebView routes every
+// load (document, subresource, XHR/fetch) for ari-flash:// through this.
+@interface PayloadSchemeHandler : NSObject <WKURLSchemeHandler>
+@property(copy) NSString *root; // resolved payload dir; requests must stay inside
+@end
+
+@implementation PayloadSchemeHandler
++ (NSString *)mimeForExtension:(NSString *)ext {
+    static NSDictionary<NSString *, NSString *> *map;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        map = @{ @"html": @"text/html", @"htm": @"text/html",
+                 @"js": @"text/javascript", @"mjs": @"text/javascript",
+                 @"css": @"text/css", @"json": @"application/json",
+                 @"ini": @"text/plain", @"txt": @"text/plain",
+                 @"png": @"image/png", @"jpg": @"image/jpeg",
+                 @"jpeg": @"image/jpeg", @"gif": @"image/gif",
+                 @"svg": @"image/svg+xml", @"ico": @"image/x-icon",
+                 @"mp3": @"audio/mpeg", @"ogg": @"audio/ogg",
+                 @"wav": @"audio/wav", @"m4a": @"audio/mp4",
+                 @"woff": @"font/woff", @"woff2": @"font/woff2",
+                 @"ttf": @"font/ttf", @"wasm": @"application/wasm" };
+    });
+    return map[ext.lowercaseString] ?: @"application/octet-stream";
+}
+- (void)webView:(WKWebView *)webView startURLSchemeTask:(id<WKURLSchemeTask>)task {
+    NSURL *url = task.request.URL;
+    NSString *rel = url.path.length ? url.path : @"/";
+    NSString *full = [[self.root stringByAppendingPathComponent:rel]
+                         stringByStandardizingPath];
+    NSData *data = nil;
+    // Traversal guard: the standardized path must stay inside the payload.
+    if ([full hasPrefix:[self.root stringByAppendingString:@"/"]] ||
+        [full isEqualToString:self.root]) {
+        data = [NSData dataWithContentsOfFile:full];
+    }
+    if (!data) {
+        NSHTTPURLResponse *resp404 =
+            [[NSHTTPURLResponse alloc] initWithURL:url statusCode:404
+                                       HTTPVersion:@"HTTP/1.1" headerFields:@{}];
+        [task didReceiveResponse:resp404];
+        [task didReceiveData:[NSData data]];
+        [task didFinish];
+        return;
+    }
+    NSHTTPURLResponse *resp = [[NSHTTPURLResponse alloc]
+        initWithURL:url statusCode:200 HTTPVersion:@"HTTP/1.1"
+       headerFields:@{ @"Content-Type": [PayloadSchemeHandler
+                            mimeForExtension:full.pathExtension],
+                       @"Content-Length":
+                           [NSString stringWithFormat:@"%lu",
+                                     (unsigned long)data.length] }];
+    [task didReceiveResponse:resp];
+    [task didReceiveData:data];
+    [task didFinish];
+}
+- (void)webView:(WKWebView *)webView stopURLSchemeTask:(id<WKURLSchemeTask>)task {}
+@end
+
 @interface WrapDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property(strong) NSWindow *window;
+@property(strong) PayloadSchemeHandler *scheme;
 @end
 
 @implementation WrapDelegate
@@ -22,7 +86,36 @@
     NSNumber *w = [bundle objectForInfoDictionaryKey:@"GameWindowWidth"] ?: @1040;
     NSNumber *h = [bundle objectForInfoDictionaryKey:@"GameWindowHeight"] ?: @620;
 
-    NSString *payloadDir = [bundle.resourcePath stringByAppendingPathComponent:payload];
+    NSString *payloadDir = [[bundle.resourcePath
+        stringByAppendingPathComponent:payload] stringByStandardizingPath];
+
+    // Served mode: serve.conf routes the payload through the in-app scheme
+    // server (optional `index=` line, default index.html).
+    NSString *serveIndex = nil;
+    NSString *servePath = [payloadDir stringByAppendingPathComponent:@"serve.conf"];
+    NSString *serveConf = [NSString stringWithContentsOfFile:servePath
+                                                    encoding:NSUTF8StringEncoding error:NULL];
+    if (serveConf) {
+        serveIndex = @"index.html";
+        for (NSString *rawLine in [serveConf componentsSeparatedByCharactersInSet:
+                                        [NSCharacterSet newlineCharacterSet]]) {
+            NSString *line = [rawLine stringByTrimmingCharactersInSet:
+                                        [NSCharacterSet whitespaceCharacterSet]];
+            if ([line hasPrefix:@"index="]) { serveIndex = [line substringFromIndex:6]; break; }
+        }
+        NSString *indexOnDisk = [payloadDir stringByAppendingPathComponent:serveIndex];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:indexOnDisk]) {
+            fprintf(stderr, "Game files not found: missing %s. "
+                    "Reinstall with: brew reinstall <game>\n", indexOnDisk.UTF8String);
+            if (getenv("ARI_FLASH_NO_DIALOG")) exit(1);
+            NSAlert *a = [NSAlert new];
+            a.messageText = @"Game files not found";
+            a.informativeText = [NSString stringWithFormat:
+                @"Missing %@. Reinstall with: brew reinstall <game>", indexOnDisk];
+            [a runModal];
+            exit(1);
+        }
+    }
 
     // Wrapper mode: site.conf names a remote URL to load instead of index.html.
     NSURL *remote = nil;
@@ -47,7 +140,7 @@
     }
 
     NSString *index = [payloadDir stringByAppendingPathComponent:@"index.html"];
-    if (!remote && ![[NSFileManager defaultManager] fileExistsAtPath:index]) {
+    if (!remote && !serveIndex && ![[NSFileManager defaultManager] fileExistsAtPath:index]) {
         // Mirror the fail() semantics of the exec-style launchers: always log
         // to stderr, dialog only when interactive, and exit nonzero so
         // headless/CI checks (ARI_FLASH_NO_DIALOG=1) see a real failure.
@@ -75,9 +168,17 @@
     self.window.delegate = self;
 
     WKWebViewConfiguration *cfg = [WKWebViewConfiguration new];
+    if (serveIndex) {
+        self.scheme = [PayloadSchemeHandler new];
+        self.scheme.root = payloadDir;
+        [cfg setURLSchemeHandler:self.scheme forURLScheme:@"ari-flash"];
+    }
     WKWebView *web = [[WKWebView alloc] initWithFrame:frame configuration:cfg];
     web.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    if (remote) {
+    if (serveIndex) {
+        NSString *u = [NSString stringWithFormat:@"ari-flash://game/%@", serveIndex];
+        [web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:u]]];
+    } else if (remote) {
         [web loadRequest:[NSURLRequest requestWithURL:remote]];
     } else {
         [web loadFileURL:[NSURL fileURLWithPath:index]

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!-- Offline wrapper for Super Slime Soccer (GameMaker HTML5 export).
+     Game files under html5game/ are fetched from superslimesoccer.io AT
+     INSTALL TIME by bin/site-vendor — the tap redistributes nothing.
+     Served through web-launcher's in-app URL-scheme server (serve.conf):
+     GameMaker loads its ini via XHR, which file:// forbids. The game
+     probes html5game/data.ini, which upstream itself 404s — the scheme
+     server answers missing files with a clean 404 to match. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Super Slime Soccer</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div class="gm4html5_div_class" id="gm4html5_div_id">
+  <canvas id="canvas" width="560" height="400"></canvas>
+</div>
+<script src="html5game/SSS.js" type="text/javascript"></script>
+<script>window.onload = function () { GameMaker_Init(); };</script>
+</body>
+</html>
