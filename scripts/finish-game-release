@@ -5,8 +5,8 @@
 # Usage:
 #   scripts/finish-game-release <slug> <path/to/downloaded.swf>
 #
-# Example (QWOP, once the swf is downloaded):
-#   scripts/finish-game-release qwop ~/Downloads/qwop.swf
+# Example (once the swf is downloaded):
+#   scripts/finish-game-release my-game ~/Downloads/my-game.swf
 #
 # What it does, in order (fails fast at every step):
 #   1. copies the swf to games/<slug>/game.swf
