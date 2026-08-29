@@ -52,8 +52,8 @@ it back to the drawing board — do not hand-fix the test machine.
   - Success: pulls the `ari-flash-jre` cask automatically;
     `$(brew --prefix)/bin/ari-flash-java` exists and `ari-flash-java -version`
     reports Temurin 17; `/Applications/Slime Soccer.app` exists.
-- [ ] `brew install arisweedler/flash/slime-volleyball` (the JAVA original)
-  - Success: exits 0 (JRE already present); `/Applications/Slime Volleyball.app` exists.
+- [ ] `brew install arisweedler/flash/slime-volleyball` (official JS port, offline)
+  - Success: exits 0; NO JRE needed for this one; `/Applications/Slime Volleyball.app` exists.
 - [ ] `brew install arisweedler/flash/slime-volleyball-2p` (the PvP original)
   - Success: exits 0 (JRE already present); `/Applications/Slime Volleyball 2P.app` exists.
 - [ ] `brew install arisweedler/flash/godot-slime-soccer` (godot trial variant)
@@ -81,19 +81,16 @@ it back to the drawing board — do not hand-fix the test machine.
 
 ## 3b. Launch the wrapped games
 
-Java originals (deferred GUI checks from authoring — all four matter):
+Wrapped originals (deferred GUI checks from authoring — all four matter):
 - [ ] Double-click `/Applications/Slime Soccer.app` — window renders at 700x350;
       dock shows the game name/icon (not a generic java cup); keyboard input
       works; focus returns after cmd-tab away and back.
 - [ ] Double-click `/Applications/Slime Volleyball.app` — window at 750x375
-      (One Slime, 1-player-vs-CPU); an offline "Couldn't connect to server!"
-      dialog about high scores is EXPECTED and benign — dismiss it (see
-      games/slime-volleyball/PROVENANCE.md); gameplay is fully local.
+      (One Slime, 1-player-vs-CPU, the author's official 60 FPS JS port):
+      motion is display-synced smooth; arrows move/jump; click to start.
 - [ ] Double-click `/Applications/Slime Volleyball 2P.app` — window at 700x350;
       both players' keys work on one keyboard (P1 A/W/D, P2 arrows).
-- [ ] All three run with Wi-Fi off (soccer and 2P are bytecode-audited
-      no-network; One Slime only phones home for high scores, which fail
-      gracefully).
+- [ ] All three run with Wi-Fi off (all bytecode/JS-audited: no network).
 - [ ] Quitting the window fully exits the process (no lingering java in
       `ps -ax | grep ari-flash-java`).
 - [ ] Keyboard regression (fixed in soccer/volleyball 2.1.1, 2p 1.0.1): keys

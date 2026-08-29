@@ -1,25 +1,23 @@
-# Slime Volleyball — the ORIGINAL One Slime (2007): 1-player-vs-CPU Slime
-# Volleyball ending in the Inferno boss
-# applet bytecode (Q. Pendragon), run unmodified on the tap's pinned
-# Temurin 17 JRE (ari-flash-jre) via the applet-harness + java-launcher.
-# The applet class name rides in the payload as game/applet.conf.
+# Slime Volleyball — One Slime (1-player-vs-CPU, ending in the Inferno boss)
+# as the AUTHOR'S OFFICIAL JavaScript port served on oneslime.net, vendored
+# offline into the tap's WKWebView stub (web-launcher). Chosen over the 2007
+# applet bytecode: the JS port renders via requestAnimationFrame — display-
+# synced 60 FPS versus the applet's 20ms/50fps thread loop.
 #
-# THE slime-volleyball cask (the user picked the Java original). The broken
-# JS port lives on as `wip-slime-volleyball` for investigation. Version starts
-# at 2.0.0 because the slime-volleyball-v1.0.0 tag immutably holds the old
-# JS asset.
+# THE slime-volleyball cask. Earlier lives: v1.x the broken slimejs port
+# (now wip-slime-volleyball), v2.0-2.1.x the 1999/2007 Java applets.
 #
 # Provenance, controls, and the redistribution note live in
 # games/slime-volleyball/PROVENANCE.md.
 cask "slime-volleyball" do
-  version "2.1.2"
-  sha256 "87737d31352c26a68d3ceae064f73b1b044d9ae03d02bed1c04dd2b8b7bf4497"
+  version "2.2.0"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
-  # bin/wrap-bundler, java-launcher/java-launcher, games/slime-volleyball/.
+  # bin/wrap-bundler, web-launcher/web-launcher, games/slime-volleyball/.
   url "https://github.com/AriSweedler/homebrew-flash/releases/download/slime-volleyball-v#{version}/slime-volleyball-#{version}.tar.gz"
   name "Slime Volleyball"
-  desc "Original One Slime (2007): 1P-vs-CPU Slime Volleyball on a bundled-tap JRE"
+  desc "One Slime (1P-vs-CPU): the author's official 60 FPS JS port, offline"
   homepage "https://oneslime.net/"
 
   # All the tap's games share one GitHub repo; scan all releases and anchor
@@ -30,9 +28,6 @@ cask "slime-volleyball" do
     regex(/^slime-volleyball-v(\d+(?:\.\d+)+)$/i)
   end
 
-  # The JRE cask provides $(brew --prefix)/bin/ari-flash-java; the CLI
-  # formula (ari-flash-launcher) arrives via depends_on below.
-  depends_on cask: "arisweedler/flash/ari-flash-jre"
   depends_on formula: "arisweedler/flash/ari-flash-launcher"
   depends_on :macos
 
@@ -46,15 +41,15 @@ cask "slime-volleyball" do
                      "#{staged_path}/bin/wrap-bundler",
                      "--name", "Slime Volleyball",
                      "--id", "com.arisweedler.flash.slime-volleyball",
-                     "--payload", "#{staged_path}/games/slime-volleyball/game",
-                     "--payload-name", "game",
+                     "--payload", "#{staged_path}/games/slime-volleyball/web",
+                     "--payload-name", "web",
                      "--icon", "#{staged_path}/games/slime-volleyball/icon.png",
-                     "--launcher-bin", "#{staged_path}/java-launcher/java-launcher",
+                     "--launcher-bin", "#{staged_path}/web-launcher/web-launcher",
                      # The original embed size: the applet's internal 400px
                      # height minus the 50px ground band the site clipped —
                      # matches the authentic look (see PROVENANCE.md).
-                     "--window", "750x375", # One Slime's original embed size
-                     "--desc", "Original One Slime (2007): 1P-vs-CPU Slime Volleyball on a bundled-tap JRE",
+                     "--window", "750x375", # exactly the canvas; wrapper page has zero margin
+                     "--desc", "One Slime (1P-vs-CPU): the author's official 60 FPS JS port, offline",
                      "--updated", "2026-08-29",
                      "--version", version.to_s,
                      "--out", staged_path.to_s
@@ -62,9 +57,13 @@ cask "slime-volleyball" do
                    print_stderr: true
   end
 
-  # The game itself writes no files (bytecode-audited: no I/O, no network).
-  # The running java process is bundle-less, so its prefs/saved state live
-  # under the SHARED net.java.openjdk.java domains used by any Java app —
-  # deliberately not zapped per game.
-  zap trash: "~/Library/Saved Application State/com.arisweedler.flash.slime-volleyball.savedState"
+  # WKWebView's per-app storage (the game itself uses no localStorage, but
+  # WebKit still creates the dirs; HTTPStorages glob covers .binarycookies).
+  zap trash: [
+    "~/Library/Caches/com.arisweedler.flash.slime-volleyball",
+    "~/Library/HTTPStorages/com.arisweedler.flash.slime-volleyball*",
+    "~/Library/Preferences/com.arisweedler.flash.slime-volleyball.plist",
+    "~/Library/Saved Application State/com.arisweedler.flash.slime-volleyball.savedState",
+    "~/Library/WebKit/com.arisweedler.flash.slime-volleyball",
+  ]
 end

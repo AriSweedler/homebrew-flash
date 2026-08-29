@@ -8,7 +8,7 @@ JAVAC ?= javac
 JAVA  ?= java
 JAR   ?= jar
 
-GAMES = ../games/slime-soccer/game ../games/slime-volleyball/game ../games/slime-volleyball-2p/game
+GAMES = ../games/slime-soccer/game ../games/slime-volleyball-2p/game
 
 .PHONY: all verify sync clean
 
