@@ -1,7 +1,7 @@
 # Copied from Casks/bubble-trouble.rb (the template); see its header comments.
 cask "get-on-top" do # (1)
   version "1.1.0" # (2)
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "d26c18100c59d0c61e8bcc26bdd17ba1e2a39c1a23315086a69767af966a0f94"
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/flash-bundler, launcher/launcher, games/<slug>/{game.swf,icon.png}.
