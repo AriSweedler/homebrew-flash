@@ -4,8 +4,8 @@
 class FlashBundler < Formula
   desc "Bundle a Flash swf + icon into a signed macOS app that runs in Ruffle"
   homepage "https://github.com/AriSweedler/homebrew-flash"
-  url "https://github.com/AriSweedler/homebrew-flash/releases/download/tools-v1.2.0/ari-flash-tools-1.2.0.tar.gz"
-  sha256 "d04307ba2a9fa7b6539d8d4294becd8c9e4bb3d0cc2d3f5b9a33d7b6935b4248"
+  url "https://github.com/AriSweedler/homebrew-flash/releases/download/tools-v1.3.0/ari-flash-tools-1.3.0.tar.gz"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
 
   def install
     # In the repo the script's default launcher is resolved relative to the

@@ -1,0 +1,56 @@
+#compdef ari-flash-launcher
+# zsh completion for ari-flash-launcher. Installed by the ari-flash-launcher
+# formula into brew's site-functions. Game slugs are completed live from
+# `list-installed --porcelain` (slug<TAB>name<TAB>version<TAB>updated<TAB>desc).
+
+_ari_flash_launcher_games() {
+  local -a games
+  local slug name _v _u desc
+  while IFS=$'\t' read -r slug name _v _u desc; do
+    games+=("${slug}:${desc}")
+  done < <(ari-flash-launcher list-installed --porcelain 2>/dev/null)
+  (( ${#games} )) && _describe -t games 'installed game' games
+}
+
+_ari_flash_launcher() {
+  local -a commands=(
+    'list-installed:installed games (version, updated, description)'
+    'list:alias of list-installed'
+    'ls:alias of list-installed'
+    'list-upstream:everything the tap offers, from GitHub'
+    'launch:open an installed game or a .swf file'
+    'help:show help'
+    'version:print the version'
+  )
+  local curcontext="${curcontext}" state
+  _arguments -C \
+    '1: :->cmd' \
+    '*:: :->args' && return
+
+  case "${state}" in
+    cmd)
+      _describe -t commands 'command' commands
+      _ari_flash_launcher_games
+      _files -g '*.swf'
+      ;;
+    args)
+      case "${words[1]}" in
+        launch)
+          _arguments '(-h --help)'{-h,--help}'[command help]'
+          _ari_flash_launcher_games
+          _files -g '*.swf'
+          ;;
+        list-installed|list|ls)
+          _arguments \
+            '--porcelain[raw tab-separated output for scripts]' \
+            '(-h --help)'{-h,--help}'[command help]'
+          ;;
+        list-upstream)
+          _arguments '(-h --help)'{-h,--help}'[command help]'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_ari_flash_launcher "$@"

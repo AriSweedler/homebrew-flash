@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!-- Vendored from mmkal/slimejs (MIT) gh-pages build. Local copies of the CDN
+     scripts so the game runs fully offline; the online-multiplayer connect
+     button needs a peer server and is not expected to work. -->
+<html>
+    <head>
+        <title>Slime Volleyball</title>
+        <script src="./lib/peer.js"></script>
+        <script src="./lib/jquery.js"></script>
+        <script src="./dist/slime.js"></script>
+        <style>
+            body { margin: 0; background: #111; display: flex; flex-direction: column; align-items: center; }
+            canvas { margin-top: 24px; background: #fff; }
+            #server { color: #888; }
+        </style>
+    </head>
+<body>
+    <div id="games"></div>
+    <canvas width="1000" height="500" style="border:1px solid black;"></canvas>
+    <div id="server" style="display:block">
+        <button id="connect" style="display: block">connect</button>
+        <div id="peerjs-log"></div>
+    </div>
+</body>
+</html>

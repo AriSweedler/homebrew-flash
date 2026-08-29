@@ -12,7 +12,7 @@
 # standalone via the arisweedler/flash tap, so no shared lib is available.
 set -euo pipefail
 
-readonly VERSION="1.2.0"
+readonly VERSION="1.3.0"
 readonly ID_PREFIX="com.arisweedler.flash."
 readonly APP_DIRS="${ARI_FLASH_APP_DIRS:-/Applications:${HOME}/Applications}"
 readonly TAP_REPO="AriSweedler/homebrew-flash"
@@ -86,7 +86,7 @@ scan_games() {
 
 #######################################
 # list-installed: table of installed games from their Info.plists (offline).
-# Arguments: optional -h/--help
+# Arguments: optional -h/--help, or --porcelain for raw TSV
 cmd_list_installed() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<EOF
@@ -95,7 +95,15 @@ ${c_green}ari-flash-launcher list-installed${c_rst} (aliases: list, ls)
 Lists installed games with version, the date the game was last updated in the
 tap, and a one-line description. Read from the installed apps' Info.plists —
 works offline and stays honest no matter how an app arrived or left.
+
+${c_bold}Options:${c_rst}
+  --porcelain   Raw tab-separated output for scripts and shell completion:
+                slug<TAB>name<TAB>version<TAB>updated<TAB>description
 EOF
+    return 0
+  fi
+  if [[ "${1:-}" == "--porcelain" ]]; then
+    scan_games | cut -f1-5 | sort
     return 0
   fi
   local games

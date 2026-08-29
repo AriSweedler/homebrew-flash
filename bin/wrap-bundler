@@ -1,0 +1,184 @@
+#!/bin/bash
+# wrap-bundler — turn a directory payload (a built web game, a Godot project)
+# plus an image into a signed, double-clickable macOS .app around a launcher
+# stub (web-launcher for web payloads, godot-launcher for Godot projects).
+# Sibling of flash-bundler; same conventions and the same signing invariant.
+#
+# Must stay bash: brew casks invoke this as `/bin/bash wrap-bundler ...`.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: wrap-bundler --name <Display Name> --id <bundle-id> --payload <dir>
+                    --icon <path> --version <semver> --out <dir>
+                    --launcher-bin <path>
+                    [--payload-name <name>] [--window <WxH>]
+                    [--desc <text>] [--updated <YYYY-MM-DD>]
+
+Builds "<out>/<Display Name>.app" containing the payload directory, a
+generated .icns, the given launcher stub, and an ad-hoc code signature.
+
+  --name          Display name of the game ("Slime Volleyball")
+  --id            Bundle identifier (com.arisweedler.flash.slime-volleyball)
+  --payload       Directory copied into Contents/Resources/<payload-name>
+  --payload-name  Name of the payload dir inside Resources (default: web);
+                  baked into Info.plist as GamePayload for the stub
+  --icon          Icon image: .icns used as-is, anything sips reads is
+                  converted (1024x1024 source recommended)
+  --version       App version (CFBundleShortVersionString / CFBundleVersion)
+  --out           Directory to create the .app in
+  --launcher-bin  Prebuilt launcher stub Mach-O to embed (REQUIRED: pass the
+                  stub that understands this payload kind)
+  --window <WxH>  Window size in pixels; baked into Info.plist as
+                  GameWindowWidth/Height for stubs that honor it
+  --desc <text>   One-line description -> Info.plist FlashGameDescription
+                  (shown by 'ari-flash-launcher list')
+  --updated <date> YYYY-MM-DD last updated in the tap -> FlashGameUpdated
+EOF
+}
+
+log() { printf 'wrap-bundler: %s\n' "$*" >&2; }
+die() { log "ERROR: $*"; exit 1; }
+
+name="" bundle_id="" payload="" payload_name="web" icon="" version="" out=""
+launcher_bin="" window="" desc="" updated=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --name)         name=${2:?--name needs a value}; shift 2 ;;
+    --id)           bundle_id=${2:?--id needs a value}; shift 2 ;;
+    --payload)      payload=${2:?--payload needs a value}; shift 2 ;;
+    --payload-name) payload_name=${2:?--payload-name needs a value}; shift 2 ;;
+    --icon)         icon=${2:?--icon needs a value}; shift 2 ;;
+    --version)      version=${2:?--version needs a value}; shift 2 ;;
+    --out)          out=${2:?--out needs a value}; shift 2 ;;
+    --launcher-bin) launcher_bin=${2:?--launcher-bin needs a value}; shift 2 ;;
+    --window)       window=${2:?--window needs a value}; shift 2 ;;
+    --desc)         desc=${2:?--desc needs a value}; shift 2 ;;
+    --updated)      updated=${2:?--updated needs a value}; shift 2 ;;
+    -h|--help)      usage; exit 0 ;;
+    *)              usage >&2; die "unknown argument: $1" ;;
+  esac
+done
+
+[ -n "$name" ]      || { usage >&2; die "--name is required"; }
+[ -n "$bundle_id" ] || { usage >&2; die "--id is required"; }
+[ -n "$version" ]   || { usage >&2; die "--version is required"; }
+[ -n "$out" ]       || { usage >&2; die "--out is required"; }
+[ -n "$payload" ] && [ -d "$payload" ] || die "--payload: no such directory: ${payload:-<missing>}"
+[ -n "$icon" ] && [ -f "$icon" ] || die "--icon: no such file: ${icon:-<missing>}"
+[ -n "$launcher_bin" ] && [ -f "$launcher_bin" ] || die "--launcher-bin: no such file: ${launcher_bin:-<missing>}"
+window_width="" window_height=""
+if [ -n "$window" ]; then
+  [[ $window =~ ^([0-9]+)x([0-9]+)$ ]] || die "--window must be <width>x<height> in pixels: $window"
+  window_width=${BASH_REMATCH[1]} window_height=${BASH_REMATCH[2]}
+fi
+if [ -n "$updated" ]; then
+  [[ $updated =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "--updated must be YYYY-MM-DD: $updated"
+fi
+
+# Executable name: CamelCase, alphanumerics only ("Slime Volleyball" -> SlimeVolleyball)
+executable=$(printf '%s' "$name" | awk '{
+  n = split($0, w, /[^[:alnum:]]+/); out = ""
+  for (i = 1; i <= n; i++) if (w[i] != "")
+    out = out toupper(substr(w[i],1,1)) substr(w[i],2)
+  print out
+}')
+[ -n "$executable" ] || die "--name must contain at least one alphanumeric character"
+
+app="$out/$name.app"
+contents="$app/Contents"
+workdir=$(mktemp -d "${TMPDIR:-/tmp}/wrap-bundler.XXXXXX")
+trap 'rm -rf "$workdir"' EXIT
+
+log "building '$app' (id=$bundle_id, executable=$executable, payload=$payload_name)"
+rm -rf "$app"
+mkdir -p "$contents/MacOS" "$contents/Resources"
+
+# --- icon (same pipeline as flash-bundler) -----------------------------------
+icns="$contents/Resources/$executable.icns"
+if [[ $icon == *.icns ]]; then
+  log "icon: .icns input, using as-is"
+  cp "$icon" "$icns"
+else
+  log "icon: rendering iconset from $(basename "$icon")"
+  iconset="$workdir/icon.iconset"
+  mkdir "$iconset"
+  for entry in \
+    icon_16x16.png:16 icon_16x16@2x.png:32 \
+    icon_32x32.png:32 icon_32x32@2x.png:64 \
+    icon_128x128.png:128 icon_128x128@2x.png:256 \
+    icon_256x256.png:256 icon_256x256@2x.png:512 \
+    icon_512x512.png:512 icon_512x512@2x.png:1024; do
+    fname=${entry%%:*} px=${entry##*:}
+    sips -s format png -z "$px" "$px" "$icon" --out "$iconset/$fname" >/dev/null \
+      || die "sips failed on $icon at ${px}px (unreadable image format?)"
+  done
+  iconutil -c icns "$iconset" -o "$icns" || die "iconutil failed"
+fi
+
+# --- payload ------------------------------------------------------------------
+log "payload: copying $(basename "$payload") -> Resources/$payload_name"
+cp -R "$payload" "$contents/Resources/$payload_name"
+
+# --- launcher -----------------------------------------------------------------
+log "launcher: embedding prebuilt $(basename "$launcher_bin")"
+cp "$launcher_bin" "$contents/MacOS/$executable"
+chmod 755 "$contents/MacOS/$executable"
+
+# --- Info.plist -----------------------------------------------------------------
+meta_plist=""
+if [ -n "$desc" ]; then
+  desc_xml=${desc//&/&amp;}; desc_xml=${desc_xml//</&lt;}; desc_xml=${desc_xml//>/&gt;}
+  meta_plist+=$(printf '\n\t<key>FlashGameDescription</key>\n\t<string>%s</string>' "$desc_xml")
+fi
+if [ -n "$updated" ]; then
+  meta_plist+=$(printf '\n\t<key>FlashGameUpdated</key>\n\t<string>%s</string>' "$updated")
+fi
+window_plist=""
+if [ -n "$window_width" ]; then
+  window_plist=$(printf '\n\t<key>GameWindowWidth</key>\n\t<integer>%s</integer>\n\t<key>GameWindowHeight</key>\n\t<integer>%s</integer>' "$window_width" "$window_height")
+fi
+cat > "$contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>$name</string>
+	<key>CFBundleDisplayName</key>
+	<string>$name</string>
+	<key>CFBundleExecutable</key>
+	<string>$executable</string>
+	<key>CFBundleIconFile</key>
+	<string>$executable</string>
+	<key>CFBundleIdentifier</key>
+	<string>$bundle_id</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$version</string>
+	<key>CFBundleVersion</key>
+	<string>$version</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>GamePayload</key>
+	<string>$payload_name</string>${window_plist}${meta_plist}
+</dict>
+</plist>
+EOF
+plutil -lint -s "$contents/Info.plist" >/dev/null || die "generated Info.plist failed lint"
+
+# --- THE INVARIANT: strip quarantine, then sign, then verify -----------------
+# brew propagates com.apple.quarantine onto every staged file, and macOS
+# SIGKILLs quarantined Mach-O executables. Order is load-bearing.
+log "stripping extended attributes (quarantine)"
+xattr -cr "$app"
+log "codesigning (ad-hoc)"
+codesign --force -s - "$app" || die "codesign failed"
+codesign --verify --strict "$app" || die "signature verification failed"
+
+log "OK"
+printf '%s\n' "$app"
