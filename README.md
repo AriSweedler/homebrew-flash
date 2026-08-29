@@ -39,6 +39,23 @@ name and icon in the Dock.
 The `ruffle` cask here repackages upstream's notarized nightly build — no
 compiling from source, no DMG to click through.
 
+## Listing your games
+
+`ari-flash-launcher` (installed with everything) knows two views:
+
+```sh
+ari-flash-launcher list             # installed games: version, last updated,
+                                    # one-line description ('ls' and
+                                    # 'list-installed' are the same)
+ari-flash-launcher list-upstream    # everything the tap offers, straight from
+                                    # GitHub (no brew involved); '*' marks the
+                                    # ones you already have
+```
+
+The installed list is read from the apps themselves (flash-bundler bakes the
+version, update date, and description into each Info.plist), so it works
+offline and stays honest no matter how an app arrived or left.
+
 ## The two CLIs
 
 - **`ari-flash-launcher`** (installed automatically with ruffle):

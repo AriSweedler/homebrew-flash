@@ -29,6 +29,13 @@ launcher stub, and an ad-hoc code signature.
                   — authoring machines only, never end users)
   --library-swf   Install the swf at this ABSOLUTE path instead of embedding,
                   and point the app there via Info.plist FlashGameSWF
+  --desc <text>   One-line game description, baked into Info.plist as
+                  FlashGameDescription (shown by 'ari-flash-launcher list')
+  --updated <date> YYYY-MM-DD the game was last updated in the tap; baked in
+                  as FlashGameUpdated (shown by 'ari-flash-launcher list')
+  --window <WxH>  Open ruffle at this window size in pixels (e.g. 1000x750);
+                  baked into Info.plist as RuffleWindowWidth/Height. Old movies
+                  declare tiny stages, so ~2x the stage size is a good pick
 EOF
 }
 
@@ -48,7 +55,7 @@ resolve() {
 }
 
 name="" bundle_id="" swf="" icon="" version="" out=""
-launcher_bin="" launcher_src="" library_swf=""
+launcher_bin="" launcher_src="" library_swf="" window="" desc="" updated=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -61,6 +68,9 @@ while [ $# -gt 0 ]; do
     --launcher-bin) launcher_bin=${2:?--launcher-bin needs a value}; shift 2 ;;
     --launcher-src) launcher_src=${2:?--launcher-src needs a value}; shift 2 ;;
     --library-swf)  library_swf=${2:?--library-swf needs a value}; shift 2 ;;
+    --window)       window=${2:?--window needs a value}; shift 2 ;;
+    --desc)         desc=${2:?--desc needs a value}; shift 2 ;;
+    --updated)      updated=${2:?--updated needs a value}; shift 2 ;;
     -h|--help)      usage; exit 0 ;;
     *)              usage >&2; die "unknown argument: $1" ;;
   esac
@@ -77,6 +87,14 @@ if [ -n "$library_swf" ]; then
 fi
 if [ -n "$launcher_bin" ] && [ -n "$launcher_src" ]; then
   die "--launcher-bin and --launcher-src are mutually exclusive"
+fi
+window_width="" window_height=""
+if [ -n "$window" ]; then
+  [[ $window =~ ^([0-9]+)x([0-9]+)$ ]] || die "--window must be <width>x<height> in pixels: $window"
+  window_width=${BASH_REMATCH[1]} window_height=${BASH_REMATCH[2]}
+fi
+if [ -n "$updated" ]; then
+  [[ $updated =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "--updated must be YYYY-MM-DD: $updated"
 fi
 
 SCRIPT_DIR=$(dirname "$(resolve "$0")")
@@ -157,6 +175,20 @@ fi
 chmod 755 "$contents/MacOS/$executable"
 
 # --- Info.plist -------------------------------------------------------------
+# Optional window size: the launcher passes these to ruffle as --width/--height
+# (old movies declare tiny stages and ruffle otherwise opens at exactly that).
+meta_plist=""
+if [ -n "$desc" ]; then
+  desc_xml=${desc//&/&amp;}; desc_xml=${desc_xml//</&lt;}; desc_xml=${desc_xml//>/&gt;}
+  meta_plist+=$(printf '\n\t<key>FlashGameDescription</key>\n\t<string>%s</string>' "$desc_xml")
+fi
+if [ -n "$updated" ]; then
+  meta_plist+=$(printf '\n\t<key>FlashGameUpdated</key>\n\t<string>%s</string>' "$updated")
+fi
+window_plist=""
+if [ -n "$window_width" ]; then
+  window_plist=$(printf '\n\t<key>RuffleWindowWidth</key>\n\t<integer>%s</integer>\n\t<key>RuffleWindowHeight</key>\n\t<integer>%s</integer>' "$window_width" "$window_height")
+fi
 cat > "$contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -181,7 +213,7 @@ cat > "$contents/Info.plist" <<EOF
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
 	<key>FlashGameSWF</key>
-	<string>$swf_plist_value</string>
+	<string>$swf_plist_value</string>${window_plist}${meta_plist}
 </dict>
 </plist>
 EOF

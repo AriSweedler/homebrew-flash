@@ -1,13 +1,13 @@
 # Copied from Casks/bubble-trouble.rb (the template); see its header comments.
 cask "get-on-top" do # (1)
-  version "1.0.0" # (2)
-  sha256 "bc16c257267efe5ad895d0191ed5e8e88e813941769afb8b19f25deb4d93b1d0"
+  version "1.1.0" # (2)
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/flash-bundler, launcher/launcher, games/<slug>/{game.swf,icon.png}.
   url "https://github.com/AriSweedler/homebrew-flash/releases/download/get-on-top-v#{version}/get-on-top-#{version}.tar.gz"
   name "Get On Top" # (4)
-  desc "Classic Flash game, bundled at install into a signed app that runs in Ruffle"
+  desc "Two-player physics duel: wrestle your rival's head into the ground"
   homepage "https://github.com/AriSweedler/homebrew-flash"
 
   depends_on cask: "arisweedler/flash/ruffle"
@@ -31,6 +31,9 @@ cask "get-on-top" do # (1)
                      "--id", "com.arisweedler.flash.get-on-top",
                      "--swf", "#{staged_path}/games/get-on-top/game.swf",
                      "--icon", "#{staged_path}/games/get-on-top/icon.png",
+                     "--desc", "Two-player physics duel: wrestle your rival's head into the ground",
+                     "--updated", "2026-08-28",
+                     "--window", "1000x750", # 2x the swf stage (500x375)
                      "--version", version.to_s,
                      "--out", staged_path.to_s
                    ],

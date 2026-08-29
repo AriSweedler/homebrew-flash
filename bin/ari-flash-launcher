@@ -1,24 +1,33 @@
 #!/bin/bash
-# ari-flash-launcher — launch brew-installed Flash games in Ruffle.
+# ari-flash-launcher — launch and list brew-installed Flash games.
 #
 # The installed .apps ARE the registry: games are discovered by scanning
 # application dirs for bundles whose CFBundleIdentifier starts with
 # com.arisweedler.flash. (deterministic plutil scan; mdfind is not used because
-# Spotlight lags fresh installs and can be disabled).
+# Spotlight lags fresh installs and can be disabled). Version, last-updated
+# date, and description are baked into each app's Info.plist by flash-bundler.
 set -euo pipefail
 
 ID_PREFIX="com.arisweedler.flash."
 APP_DIRS="${ARI_FLASH_APP_DIRS:-/Applications:${HOME}/Applications}"
+TAP_REPO="AriSweedler/homebrew-flash"
 
 usage() {
   cat <<EOF
-Usage: ari-flash-launcher [<game>|<path/to.swf>|--list|--help]
+Usage: ari-flash-launcher <command|game|path/to.swf>
 
-  <game>         Slug or display name of an installed game (case-insensitive),
-                 e.g. 'bubble-trouble' or 'Bubble Trouble'. Opens its .app.
-  <path/to.swf>  Open an arbitrary SWF file directly in Ruffle.
-  --list         List installed games (default when run with no arguments).
-  --help         This help.
+Commands:
+  list-installed   List installed games: version, last updated, description.
+  list, ls         Aliases of list-installed (also the default with no args).
+  list-upstream    List every game the tap offers (straight from GitHub —
+                   no brew needed), marking which are already installed.
+  --help, -h       This help.
+
+Anything else:
+  <game>           Slug or display name of an installed game
+                   (case-insensitive), e.g. 'bubble-trouble' or
+                   'Bubble Trouble'. Opens its .app.
+  <path/to.swf>    Open an arbitrary SWF file directly in Ruffle.
 
 Games are discovered by scanning for apps with a ${ID_PREFIX}* bundle
 identifier in: /Applications and ~/Applications.
@@ -29,39 +38,80 @@ Environment:
 EOF
 }
 
-# Print one line per installed game: "<slug>\t<display name>\t<app path>"
+plist_get() { plutil -extract "$2" raw -o - "$1" 2>/dev/null || printf ''; }
+
+# One line per installed game:
+# "<slug>\t<name>\t<version>\t<updated>\t<desc>\t<app path>"
 scan_games() {
-  local dir app plist id name
+  local dir app plist id name version updated desc
   local IFS=':'
   for dir in $APP_DIRS; do
     [ -d "$dir" ] || continue
     for app in "$dir"/*.app; do
       plist="$app/Contents/Info.plist"
       [ -f "$plist" ] || continue
-      id=$(plutil -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null) || continue
+      id=$(plist_get "$plist" CFBundleIdentifier)
       case "$id" in
         "$ID_PREFIX"*) ;;
         *) continue ;;
       esac
-      name=$(plutil -extract CFBundleName raw -o - "$plist" 2>/dev/null) \
-        || name=$(basename "$app" .app)
-      printf '%s\t%s\t%s\n' "${id#"$ID_PREFIX"}" "$name" "$app"
+      name=$(plist_get "$plist" CFBundleName)
+      [ -n "$name" ] || name=$(basename "$app" .app)
+      version=$(plist_get "$plist" CFBundleShortVersionString)
+      updated=$(plist_get "$plist" FlashGameUpdated)
+      desc=$(plist_get "$plist" FlashGameDescription)
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "${id#"$ID_PREFIX"}" "$name" "${version:--}" "${updated:--}" \
+        "${desc:--}" "$app"
     done
   done
 }
 
-list_games() {
+list_installed() {
   local games
   games=$(scan_games)
   if [ -z "$games" ]; then
-    echo "No flash games installed. Install one with e.g.:"
-    echo "  brew install arisweedler/flash/bubble-trouble"
+    echo "No flash games installed. See what's available with:"
+    echo "  ari-flash-launcher list-upstream"
     return
   fi
-  echo "Installed flash games (slug — name):"
-  printf '%s\n' "$games" | while IFS=$'\t' read -r slug name _; do
-    printf '  %s — %s\n' "$slug" "$name"
-  done
+  {
+    printf 'SLUG\tVERSION\tUPDATED\tDESCRIPTION\n'
+    printf '%s\n' "$games" | sort | while IFS=$'\t' read -r slug _ version updated desc _; do
+      printf '%s\t%s\t%s\t%s\n' "$slug" "$version" "$updated" "$desc"
+    done
+  } | column -t -s $'\t'
+}
+
+# Everything the tap offers, straight from GitHub releases + cask files.
+# Needs: jq (a formula dependency), curl, network.
+list_upstream() {
+  local releases installed slug
+  releases=$(curl -fsSL "https://api.github.com/repos/${TAP_REPO}/releases?per_page=100") \
+    || { echo "error: could not reach GitHub (network?)" >&2; exit 1; }
+  installed=$(scan_games | cut -f1)
+  {
+    printf ' \tSLUG\tVERSION\tUPDATED\tDESCRIPTION\n'
+    # tag "<slug>-v<version>" -> "<slug>\t<version>\t<date>"; tools-* excluded.
+    # Releases are newest-first; keep only the newest per slug.
+    printf '%s' "$releases" \
+      | jq -r '.[] | [.tag_name, (.published_at[:10])] | @tsv' \
+      | awk -F'\t' '$1 !~ /^tools-/ && match($1, /-v[0-9]/) {
+          slug = substr($1, 1, RSTART - 1)
+          ver  = substr($1, RSTART + 2)
+          if (!(slug in seen)) { seen[slug] = 1; print slug "\t" ver "\t" $2 }
+        }' \
+      | sort \
+      | while IFS=$'\t' read -r slug version date; do
+          local mark="-" desc
+          printf '%s\n' "$installed" | grep -qx "$slug" && mark="*"
+          desc=$(curl -fsSL "https://raw.githubusercontent.com/${TAP_REPO}/main/Casks/${slug}.rb" 2>/dev/null \
+            | sed -n 's/^  desc "\(.*\)"$/\1/p' | head -1)
+          printf '%s\t%s\t%s\t%s\t%s\n' "$mark" "$slug" "$version" "$date" "${desc:--}"
+        done
+  } | column -t -s $'\t'
+  echo
+  echo "* = installed. Install with: brew install arisweedler/flash/<slug>"
 }
 
 lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
@@ -77,7 +127,8 @@ do_open() {
 main() {
   local arg="${1:-}"
   case "$arg" in
-    ""|--list) list_games; exit 0 ;;
+    ""|list|ls|list-installed|--list) list_installed; exit 0 ;;
+    list-upstream) list_upstream; exit 0 ;;
     --help|-h) usage; exit 0 ;;
   esac
 
@@ -92,7 +143,7 @@ main() {
   # Otherwise match an installed game by slug or display name.
   local want slug name app
   want=$(lower "$arg")
-  while IFS=$'\t' read -r slug name app; do
+  while IFS=$'\t' read -r slug name _ _ _ app; do
     if [ "$(lower "$slug")" = "$want" ] || [ "$(lower "$name")" = "$want" ]; then
       do_open "$app"
       exit 0
@@ -102,7 +153,7 @@ $(scan_games)
 EOF
 
   echo "error: no installed game matches '$arg'" >&2
-  list_games >&2
+  list_installed >&2
   exit 1
 }
 

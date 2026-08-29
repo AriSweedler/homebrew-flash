@@ -5,17 +5,19 @@
 #   (2) version
 #   (3) sha256 (from scripts/cut-release output; "REPLACE_AT_RELEASE" until then)
 #   (4) name (the display name; also the .app name the bundler produces)
-#   (5) the --name/--id/--swf/--icon args in preflight AND the zap path
+#   (5) the preflight args: --name/--id/--swf/--icon, the one-line --desc,
+#       --updated (YYYY-MM-DD of this release), --window (~2x the swf stage),
+#       AND the zap path
 # Then follow the ADD-A-GAME checklist in README.md to tag and cut the release.
 cask "bubble-trouble" do # (1)
-  version "1.0.0" # (2)
-  sha256 "933c774e486adcbed437add9cb551baaa41c0f688248310e78d1553cf2d521a3"
+  version "1.1.0" # (2)
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE (3)
 
   # A FLAT tarball (no top-level dir) cut by scripts/cut-release from the tag:
   # bin/flash-bundler, launcher/launcher, games/<slug>/{game.swf,icon.png}.
   url "https://github.com/AriSweedler/homebrew-flash/releases/download/bubble-trouble-v#{version}/bubble-trouble-#{version}.tar.gz"
   name "Bubble Trouble" # (4)
-  desc "Classic Flash game, bundled at install into a signed app that runs in Ruffle"
+  desc "Pop bouncing bubbles with your harpoon before they bounce into you"
   homepage "https://github.com/AriSweedler/homebrew-flash"
 
   depends_on cask: "arisweedler/flash/ruffle"
@@ -39,6 +41,9 @@ cask "bubble-trouble" do # (1)
                      "--id", "com.arisweedler.flash.bubble-trouble",
                      "--swf", "#{staged_path}/games/bubble-trouble/game.swf",
                      "--icon", "#{staged_path}/games/bubble-trouble/icon.png",
+                     "--desc", "Pop bouncing bubbles with your harpoon before they bounce into you",
+                     "--updated", "2026-08-28",
+                     "--window", "1400x900", # 2x the swf stage (700x450)
                      "--version", version.to_s,
                      "--out", staged_path.to_s
                    ],

@@ -54,8 +54,20 @@ int main(int argc, char *argv[]) {
             fail(@"Ruffle is not installed",
                  @"Install it with:\n\nbrew install arisweedler/flash/ruffle");
         }
-        char *const args[] = { (char *)ruffle.fileSystemRepresentation,
-                               (char *)swf.fileSystemRepresentation, NULL };
+        // Old movies declare tiny stages (Get On Top: 500x375); without an
+        // explicit size Ruffle opens the window at exactly that. The bundler
+        // bakes RuffleWindowWidth/Height into Info.plist (--window WxH).
+        NSString *width = [[bundle objectForInfoDictionaryKey:@"RuffleWindowWidth"] description];
+        NSString *height = [[bundle objectForInfoDictionaryKey:@"RuffleWindowHeight"] description];
+        NSMutableArray<NSString *> *argStrings = [NSMutableArray arrayWithObject:ruffle];
+        if (width.length && height.length) {
+            [argStrings addObjectsFromArray:@[ @"--width", width, @"--height", height ]];
+        }
+        [argStrings addObject:swf];
+        char **args = calloc(argStrings.count + 1, sizeof(char *));
+        for (NSUInteger i = 0; i < argStrings.count; i++) {
+            args[i] = (char *)argStrings[i].fileSystemRepresentation;
+        }
         execv(args[0], args);
         fail(@"Failed to launch Ruffle", @(strerror(errno)));
     }
