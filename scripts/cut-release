@@ -15,7 +15,7 @@
 #   tools-v<ver>   -> ari-flash-tools-<ver>.tar.gz
 #
 # The tarball is FLAT (git archive, no --prefix): casks reference
-# "#{staged_path}/bin/flash-bundler" etc., so a top-level directory would
+# "{{staged_path}}/bin/flash-bundler" etc., so a top-level directory would
 # break every install. Auto-generated /archive/ URLs are never used because
 # GitHub does not guarantee their checksums stay stable.
 #

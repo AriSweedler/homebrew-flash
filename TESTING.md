@@ -60,7 +60,7 @@ it back to the drawing board — do not hand-fix the test machine.
   - Success: pulls the `godot3` cask automatically; `/Applications/Godot 3.app`
     and `/Applications/Godot Slime Soccer.app` exist.
 - [ ] `brew install arisweedler/flash/super-slime-soccer` (fetch-at-install)
-  - Needs NETWORK during install (preflight downloads the game from
+  - Needs NETWORK during install (preflight_steps downloads the game from
     superslimesoccer.io; the tap ships none of it). Success: exits 0;
     `/Applications/Super Slime Soccer.app` exists. With Wi-Fi off the install
     must FAIL LOUDLY naming the URL and the network hint.

@@ -19,8 +19,7 @@ cask "ari-flash-jre" do
   sha256 arm:   "190480874ccceb358cbc840393207f77ac3e63a4c5f8129d0e23e9518b96ad05",
          intel: "333cb81123c36568586646c73c8fa2326dab8badc43f5ea388a90fff59c9df27"
 
-  url "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-#{version.csv.first}%2B#{version.csv.second}/OpenJDK17U-jre_#{arch}_mac_hotspot_#{version.csv.first}_#{version.csv.second}.tar.gz",
-      verified: "github.com/adoptium/temurin17-binaries/"
+  url "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-#{version.csv.first}%2B#{version.csv.second}/OpenJDK17U-jre_#{arch}_mac_hotspot_#{version.csv.first}_#{version.csv.second}.tar.gz"
   name "Ari's Flash-tap JRE (Temurin 17)"
   desc "Java 17 runtime for the tap's classic-applet games, from Temurin's signed build"
   homepage "https://adoptium.net/"
@@ -50,10 +49,10 @@ cask "ari-flash-jre" do
   # cask downloads, and exec of a quarantined Mach-O is SIGKILLed. The JRE is
   # Developer ID signed and notarized (Eclipse Foundation), so stripping
   # quarantine is safe; it also removes the first-open confirmation dialog.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args:         ["-dr", "com.apple.quarantine", staged_path.to_s],
-                   print_stderr: false
+  postflight_steps do
+    run "/usr/bin/xattr",
+        args:         ["-dr", "com.apple.quarantine", "{{staged_path}}"],
+        print_stderr: false
   end
 
   caveats do

@@ -19,21 +19,21 @@ cask "get-on-top" do
 
   app "Get On Top.app"
 
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/flash-bundler",
-                     "--name", "Get On Top",
-                     "--id", "com.arisweedler.flash.get-on-top",
-                     "--swf", "#{staged_path}/games/get-on-top/game.swf",
-                     "--icon", "#{staged_path}/games/get-on-top/icon.png",
-                     "--desc", "Two-player physics duel: wrestle your rival's head into the ground",
-                     "--updated", "2026-08-28",
-                     "--window", "1000x750", # 2x the swf stage (500x375)
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/flash-bundler",
+          "--name", "Get On Top",
+          "--id", "com.arisweedler.flash.get-on-top",
+          "--swf", "{{staged_path}}/games/get-on-top/game.swf",
+          "--icon", "{{staged_path}}/games/get-on-top/icon.png",
+          "--desc", "Two-player physics duel: wrestle your rival's head into the ground",
+          "--updated", "2026-08-28",
+          "--window", "1000x750", # 2x the swf stage (500x375)
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   zap trash: "~/Library/Application Support/ruffle/SharedObjects/localhost#{appdir}/Get On Top.app*"

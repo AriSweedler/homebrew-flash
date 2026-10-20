@@ -6,8 +6,7 @@ cask "godot3" do
   version "3.6"
   sha256 "00cc8c8708756ad336d36bbfafd0cb6becd61e5b8e7d826309a3f4d5dda2c275"
 
-  url "https://github.com/godotengine/godot/releases/download/#{version}-stable/Godot_v#{version}-stable_osx.universal.zip",
-      verified: "github.com/godotengine/godot/"
+  url "https://github.com/godotengine/godot/releases/download/#{version}-stable/Godot_v#{version}-stable_osx.universal.zip"
   name "Godot 3 (Ari's distro)"
   desc "Pinned Godot 3 runtime used by the tap's Godot-remake games"
   homepage "https://godotengine.org/"
@@ -33,10 +32,10 @@ cask "godot3" do
   # everything it stages; a quarantined Mach-O exec is SIGKILLed. The app is
   # notarized (Prehensile Tales B.V.), so stripping quarantine is safe — and
   # also removes the first-open dialog.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args:         ["-dr", "com.apple.quarantine", "#{appdir}/Godot 3.app"],
-                   print_stderr: true
+  postflight_steps do
+    run "/usr/bin/xattr",
+        args:         ["-dr", "com.apple.quarantine", "{{appdir}}/Godot 3.app"],
+        print_stderr: true
   end
 
   # NOTE: "Application Support/Godot" holds editor config AND app_userdata

@@ -14,7 +14,7 @@
 #
 # Every download is bounded (--connect-timeout 5, --max-time 120, 2 retries)
 # and lands atomically (tmp file + mv). Exits nonzero with the offending URL
-# on any required failure — cask preflights surface that as "install needs
+# on any required failure — cask preflight_steps surface that as "install needs
 # network once".
 set -euo pipefail
 

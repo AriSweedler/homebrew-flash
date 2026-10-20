@@ -39,23 +39,23 @@ cask "slime-soccer" do
 
   # Same build-at-install pattern as the flash games; wrap-bundler performs
   # the invariant chain: assemble -> xattr -cr -> ad-hoc sign -> verify.
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/wrap-bundler",
-                     "--name", "Slime Soccer",
-                     "--id", "com.arisweedler.flash.slime-soccer",
-                     "--payload", "#{staged_path}/games/slime-soccer/game",
-                     "--payload-name", "game",
-                     "--icon", "#{staged_path}/games/slime-soccer/icon.png",
-                     "--launcher-bin", "#{staged_path}/java-launcher/java-launcher",
-                     "--window", "700x350", # the original embed size
-                     "--desc", "Original 2002 World Cup Soccer Slime Java applet, run on a bundled-tap JRE",
-                     "--updated", "2026-08-29",
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/wrap-bundler",
+          "--name", "Slime Soccer",
+          "--id", "com.arisweedler.flash.slime-soccer",
+          "--payload", "{{staged_path}}/games/slime-soccer/game",
+          "--payload-name", "game",
+          "--icon", "{{staged_path}}/games/slime-soccer/icon.png",
+          "--launcher-bin", "{{staged_path}}/java-launcher/java-launcher",
+          "--window", "700x350", # the original embed size
+          "--desc", "Original 2002 World Cup Soccer Slime Java applet, run on a bundled-tap JRE",
+          "--updated", "2026-08-29",
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   # The game itself writes no files (bytecode-audited: no I/O, no network).

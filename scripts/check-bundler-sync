@@ -4,7 +4,7 @@
 #
 # The two bundlers are DELIBERATELY two self-contained copies: game casks
 # execute the snapshot inside their pinned, immutable release asset
-# ("#{staged_path}/bin/flash-bundler" / ".../bin/wrap-bundler"), so a shared
+# ("{{staged_path}}/bin/flash-bundler" / ".../bin/wrap-bundler"), so a shared
 # sourced lib would change the asset layout for every future release. The
 # price is that shared fixes must land twice; this script makes forgetting
 # the second copy a loud failure instead of silent drift.

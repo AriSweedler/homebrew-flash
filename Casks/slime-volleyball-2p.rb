@@ -37,26 +37,26 @@ cask "slime-volleyball-2p" do
 
   # Same build-at-install pattern as the flash games; wrap-bundler performs
   # the invariant chain: assemble -> xattr -cr -> ad-hoc sign -> verify.
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/wrap-bundler",
-                     "--name", "Slime Volleyball 2P",
-                     "--id", "com.arisweedler.flash.slime-volleyball-2p",
-                     "--payload", "#{staged_path}/games/slime-volleyball-2p/game",
-                     "--payload-name", "game",
-                     "--icon", "#{staged_path}/games/slime-volleyball-2p/icon.png",
-                     "--launcher-bin", "#{staged_path}/java-launcher/java-launcher",
-                     # The original embed size: the applet's internal 400px
-                     # height minus the 50px ground band the site clipped —
-                     # matches the authentic look (see PROVENANCE.md).
-                     "--window", "700x350", # the original embed size
-                     "--desc", "Original two-player (PvP) Slime Volleyball applet on a bundled-tap JRE",
-                     "--updated", "2026-08-29",
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/wrap-bundler",
+          "--name", "Slime Volleyball 2P",
+          "--id", "com.arisweedler.flash.slime-volleyball-2p",
+          "--payload", "{{staged_path}}/games/slime-volleyball-2p/game",
+          "--payload-name", "game",
+          "--icon", "{{staged_path}}/games/slime-volleyball-2p/icon.png",
+          "--launcher-bin", "{{staged_path}}/java-launcher/java-launcher",
+          # The original embed size: the applet's internal 400px
+          # height minus the 50px ground band the site clipped —
+          # matches the authentic look (see PROVENANCE.md).
+          "--window", "700x350", # the original embed size
+          "--desc", "Original two-player (PvP) Slime Volleyball applet on a bundled-tap JRE",
+          "--updated", "2026-08-29",
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   # The game itself writes no files (bytecode-audited: no I/O, no network).

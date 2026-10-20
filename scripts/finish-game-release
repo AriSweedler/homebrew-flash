@@ -78,7 +78,7 @@ s = open(path).read()
 new = f'"--window", "{ww}x{wh}", # 2x the swf stage ({sw}x{sh})'
 s2 = re.sub(r'"--window", "\d+x\d+",[^\n]*', new, s)
 if s2 == s:
-    sys.exit(f"no --window line found in {path} — add one to the preflight args")
+    sys.exit(f"no --window line found in {path} — add one to the preflight_steps args")
 open(path, "w").write(s2)
 PYEOF
 

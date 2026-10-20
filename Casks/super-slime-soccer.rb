@@ -1,7 +1,7 @@
 # Super Slime Soccer — Jens Dahl Møllerhøj's modern HTML5 successor to the
 # classic slime games (superslimesoccer.io), FULLY OFFLINE after install.
 # The game is actively maintained with no offline build or license, so this
-# tap redistributes NOTHING of it: the preflight's site-vendor step downloads
+# tap redistributes NOTHING of it: the preflight_steps site-vendor step downloads
 # the game's files (a GameMaker HTML5 export: SSS.js + two texture pages)
 # from the official site ON THE INSTALLING MACHINE — install needs network
 # once — and wrap-bundler embeds them. web-launcher serves the payload
@@ -35,36 +35,38 @@ cask "super-slime-soccer" do
 
   # Same build-at-install pattern as the flash games; wrap-bundler carries the
   # same quarantine-strip-then-sign invariant as flash-bundler.
-  preflight do
+  preflight_steps do
     # Fetch the game from its official site onto THIS machine (the tap ships
     # none of it). Fails loudly offline: installing needs network once.
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/site-vendor",
-                     "--base-url", "https://www.superslimesoccer.io",
-                     "--out", "#{staged_path}/games/super-slime-soccer/web",
-                     "--path", "html5game/SSS.js",
-                     "--path", "html5game/SSS_texture_0.png",
-                     "--path", "html5game/SSS_texture_1.png",
-                     "--optional", "html5game/data.ini"
-                   ],
-                   print_stderr: true
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/wrap-bundler",
-                     "--name", "Super Slime Soccer",
-                     "--id", "com.arisweedler.flash.super-slime-soccer",
-                     "--payload", "#{staged_path}/games/super-slime-soccer/web",
-                     "--payload-name", "web",
-                     "--icon", "#{staged_path}/games/super-slime-soccer/icon.png",
-                     "--launcher-bin", "#{staged_path}/web-launcher/web-launcher",
-                     "--window", "560x400", # the GameMaker canvas's native size
-                     "--desc", "Super Slime Soccer (superslimesoccer.io), offline after install",
-                     "--updated", "2026-08-29",
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+    # Homebrew runs install steps in a sandbox with no network unless a step asks.
+    run "/bin/bash",
+        args:           [
+          "{{staged_path}}/bin/site-vendor",
+          "--base-url", "https://www.superslimesoccer.io",
+          "--out", "{{staged_path}}/games/super-slime-soccer/web",
+          "--path", "html5game/SSS.js",
+          "--path", "html5game/SSS_texture_0.png",
+          "--path", "html5game/SSS_texture_1.png",
+          "--optional", "html5game/data.ini"
+        ],
+        print_stderr:   true,
+        network_access: true
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/wrap-bundler",
+          "--name", "Super Slime Soccer",
+          "--id", "com.arisweedler.flash.super-slime-soccer",
+          "--payload", "{{staged_path}}/games/super-slime-soccer/web",
+          "--payload-name", "web",
+          "--icon", "{{staged_path}}/games/super-slime-soccer/icon.png",
+          "--launcher-bin", "{{staged_path}}/web-launcher/web-launcher",
+          "--window", "560x400", # the GameMaker canvas's native size
+          "--desc", "Super Slime Soccer (superslimesoccer.io), offline after install",
+          "--updated", "2026-08-29",
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   # WKWebView's per-app storage: localStorage here holds the game's unlocks/

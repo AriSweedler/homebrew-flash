@@ -35,26 +35,26 @@ cask "slime-volleyball" do
 
   # Same build-at-install pattern as the flash games; wrap-bundler performs
   # the invariant chain: assemble -> xattr -cr -> ad-hoc sign -> verify.
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/wrap-bundler",
-                     "--name", "Slime Volleyball",
-                     "--id", "com.arisweedler.flash.slime-volleyball",
-                     "--payload", "#{staged_path}/games/slime-volleyball/web",
-                     "--payload-name", "web",
-                     "--icon", "#{staged_path}/games/slime-volleyball/icon.png",
-                     "--launcher-bin", "#{staged_path}/web-launcher/web-launcher",
-                     # The original embed size: the applet's internal 400px
-                     # height minus the 50px ground band the site clipped —
-                     # matches the authentic look (see PROVENANCE.md).
-                     "--window", "750x375", # exactly the canvas; wrapper page has zero margin
-                     "--desc", "One Slime (1P-vs-CPU): the author's official 60 FPS JS port, offline",
-                     "--updated", "2026-08-29",
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/wrap-bundler",
+          "--name", "Slime Volleyball",
+          "--id", "com.arisweedler.flash.slime-volleyball",
+          "--payload", "{{staged_path}}/games/slime-volleyball/web",
+          "--payload-name", "web",
+          "--icon", "{{staged_path}}/games/slime-volleyball/icon.png",
+          "--launcher-bin", "{{staged_path}}/web-launcher/web-launcher",
+          # The original embed size: the applet's internal 400px
+          # height minus the 50px ground band the site clipped —
+          # matches the authentic look (see PROVENANCE.md).
+          "--window", "750x375", # exactly the canvas; wrapper page has zero margin
+          "--desc", "One Slime (1P-vs-CPU): the author's official 60 FPS JS port, offline",
+          "--updated", "2026-08-29",
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   # WKWebView's per-app storage (the game itself uses no localStorage, but

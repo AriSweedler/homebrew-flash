@@ -33,22 +33,22 @@ cask "godot-slime-soccer" do
 
   app "Godot Slime Soccer.app"
 
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/wrap-bundler",
-                     "--name", "Godot Slime Soccer",
-                     "--id", "com.arisweedler.flash.godot-slime-soccer",
-                     "--payload", "#{staged_path}/games/godot-slime-soccer/project",
-                     "--payload-name", "project",
-                     "--icon", "#{staged_path}/games/godot-slime-soccer/icon.png",
-                     "--launcher-bin", "#{staged_path}/godot-launcher/godot-launcher",
-                     "--desc", "MIT remake of the classic Java-applet Slime Soccer (hectorbennett, Godot)",
-                     "--updated", "2026-08-29",
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/wrap-bundler",
+          "--name", "Godot Slime Soccer",
+          "--id", "com.arisweedler.flash.godot-slime-soccer",
+          "--payload", "{{staged_path}}/games/godot-slime-soccer/project",
+          "--payload-name", "project",
+          "--icon", "{{staged_path}}/games/godot-slime-soccer/icon.png",
+          "--launcher-bin", "{{staged_path}}/godot-launcher/godot-launcher",
+          "--desc", "MIT remake of the classic Java-applet Slime Soccer (hectorbennett, Godot)",
+          "--updated", "2026-08-29",
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   zap trash: [

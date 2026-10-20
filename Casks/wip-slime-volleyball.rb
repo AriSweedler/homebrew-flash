@@ -33,23 +33,23 @@ cask "wip-slime-volleyball" do
 
   # Same build-at-install pattern as the flash games; wrap-bundler carries the
   # same quarantine-strip-then-sign invariant as flash-bundler.
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/wrap-bundler",
-                     "--name", "Slime Volleyball (WIP)",
-                     "--id", "com.arisweedler.flash.wip-slime-volleyball",
-                     "--payload", "#{staged_path}/games/slime-volleyball/web",
-                     "--payload-name", "web",
-                     "--icon", "#{staged_path}/games/slime-volleyball/icon.png",
-                     "--launcher-bin", "#{staged_path}/web-launcher/web-launcher",
-                     "--window", "1040x640", # canvas is 1000x500 plus chrome
-                     "--desc", "BROKEN upstream JS port of Slime Volleyball, kept as WIP for investigation",
-                     "--updated", "2026-08-28",
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/wrap-bundler",
+          "--name", "Slime Volleyball (WIP)",
+          "--id", "com.arisweedler.flash.wip-slime-volleyball",
+          "--payload", "{{staged_path}}/games/slime-volleyball/web",
+          "--payload-name", "web",
+          "--icon", "{{staged_path}}/games/slime-volleyball/icon.png",
+          "--launcher-bin", "{{staged_path}}/web-launcher/web-launcher",
+          "--window", "1040x640", # canvas is 1000x500 plus chrome
+          "--desc", "BROKEN upstream JS port of Slime Volleyball, kept as WIP for investigation",
+          "--updated", "2026-08-28",
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   # WKWebView's per-app storage (HTTPStorages glob also covers the

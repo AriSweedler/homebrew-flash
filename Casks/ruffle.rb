@@ -5,8 +5,7 @@ cask "ruffle" do
   version "2026-08-28"
   sha256 "55d83d25d3bcc10552be06350301cb8d3e76851c21f79f91f71e20526e7e9f55"
 
-  url "https://github.com/ruffle-rs/ruffle/releases/download/nightly-#{version}/ruffle-nightly-#{version.tr("-", "_")}-macos-universal.tar.gz",
-      verified: "github.com/ruffle-rs/ruffle/"
+  url "https://github.com/ruffle-rs/ruffle/releases/download/nightly-#{version}/ruffle-nightly-#{version.tr("-", "_")}-macos-universal.tar.gz"
   name "Ruffle (Ari's distro)"
   desc "Flash Player emulator, repackaged from upstream's notarized nightly build"
   homepage "https://ruffle.rs/"
@@ -29,10 +28,10 @@ cask "ruffle" do
   # Mach-O is SIGKILLed on some macOS configurations. Ruffle.app is Developer
   # ID signed and notarized (Ruffle LLC), so stripping quarantine is safe; it
   # also removes the first-open confirmation dialog.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args:         ["-dr", "com.apple.quarantine", "#{appdir}/Ruffle.app"],
-                   print_stderr: false
+  postflight_steps do
+    run "/usr/bin/xattr",
+        args:         ["-dr", "com.apple.quarantine", "{{appdir}}/Ruffle.app"],
+        print_stderr: false
   end
 
   # NOTE: "Application Support/ruffle" holds config AND the SharedObjects

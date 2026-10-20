@@ -7,10 +7,10 @@
 #   (3) sha256 (from scripts/cut-release output; "REPLACE_AT_RELEASE" until then)
 #   (4) name (the display name; also the .app name the bundler produces —
 #       update the `app "<Name>.app"` stanza and the Build comment above
-#       preflight to match)
-#   (5) desc (must stay in sync with the preflight --desc value — it appears
+#       preflight_steps to match)
+#   (5) desc (must stay in sync with the preflight_steps --desc value — it appears
 #       twice in every game cask)
-#   (6) the preflight args: --name/--id/--swf/--icon, the one-line --desc,
+#   (6) the preflight_steps args: --name/--id/--swf/--icon, the one-line --desc,
 #       --updated (YYYY-MM-DD of this release), --window (~2x the swf stage),
 #       AND the zap path
 # Then follow the ADD-A-GAME checklist in README.md to tag and cut the release.
@@ -39,7 +39,7 @@ cask "bubble-trouble" do # (1)
   depends_on :macos
 
   # NOTE: file order is cosmetic (brew style enforces it); at install time the
-  # preflight block always executes BEFORE the app artifact is moved.
+  # preflight_steps block always executes BEFORE the app artifact is moved.
   app "Bubble Trouble.app"
 
   # Build "<staged_path>/Bubble Trouble.app" from the staged swf + icon:
@@ -48,21 +48,21 @@ cask "bubble-trouble" do # (1)
   # quarantines staged files, and a quarantined Mach-O is SIGKILLed on exec.
   # Invoked via /bin/bash so lost exec bits or script quarantine can never
   # matter. The bundler is fail-fast; a failure here rolls back the install.
-  preflight do
-    system_command "/bin/bash",
-                   args:         [
-                     "#{staged_path}/bin/flash-bundler",
-                     "--name", "Bubble Trouble", # (6) this arg block + zap below
-                     "--id", "com.arisweedler.flash.bubble-trouble",
-                     "--swf", "#{staged_path}/games/bubble-trouble/game.swf",
-                     "--icon", "#{staged_path}/games/bubble-trouble/icon.png",
-                     "--desc", "Pop bouncing bubbles with your harpoon before they bounce into you",
-                     "--updated", "2026-08-28",
-                     "--window", "1400x900", # 2x the swf stage (700x450)
-                     "--version", version.to_s,
-                     "--out", staged_path.to_s
-                   ],
-                   print_stderr: true
+  preflight_steps do
+    run "/bin/bash",
+        args:         [
+          "{{staged_path}}/bin/flash-bundler",
+          "--name", "Bubble Trouble", # (6) this arg block + zap below
+          "--id", "com.arisweedler.flash.bubble-trouble",
+          "--swf", "{{staged_path}}/games/bubble-trouble/game.swf",
+          "--icon", "{{staged_path}}/games/bubble-trouble/icon.png",
+          "--desc", "Pop bouncing bubbles with your harpoon before they bounce into you",
+          "--updated", "2026-08-28",
+          "--window", "1400x900", # 2x the swf stage (700x450)
+          "--version", "{{version}}",
+          "--out", "{{staged_path}}"
+        ],
+        print_stderr: true
   end
 
   # Ruffle keys SharedObjects (save data) by the swf's on-disk location, and
