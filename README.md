@@ -1,5 +1,8 @@
 # homebrew-flash
 
+> **Here for Ultimate Motherload?** Start at [games/ultimate-motherload](games/ultimate-motherload/README.md):
+> one command installs it as a Mac app.
+
 Ari's Homebrew tap for rescued classic games on macOS. Each game installs as a
 real, signed `.app` — Flash games open in [Ruffle](https://ruffle.rs), and a
 couple of non-Flash rescues ship with their own offline runtime — plus a CLI
