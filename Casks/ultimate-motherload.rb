@@ -7,7 +7,7 @@
 # around it as for every Flash game. Install needs network once; play is offline.
 cask "ultimate-motherload" do
   version "1.0.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AT_RELEASE
+  sha256 "389d493962c8cb80d1e3ec1062ed4ef0524ac87f83d2af9e14e05ae1fc1ad054"
 
   # A FLAT tarball cut by scripts/cut-release from the tag: bin/flash-bundler,
   # bin/site-vendor, launcher/launcher, games/ultimate-motherload/ (icon + PROVENANCE.md).
