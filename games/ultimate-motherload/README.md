@@ -1,7 +1,7 @@
 # Ultimate Motherload on your Mac
 
 Play **Ultimate Motherload**, jeremiah855's mod of the classic Flash game Motherload, as a normal
-Mac app. It's free, and it takes a few minutes.
+Mac app. It's free.
 
 All the credit goes to the creator: **[jeremiah855/Ultimate_Motherload](https://github.com/jeremiah855/Ultimate_Motherload)**.
 Go give the repo a star. I learned about this mod from
@@ -10,8 +10,13 @@ Go give the repo a star. I learned about this mod from
 ## Install
 
 1. Open **Terminal** (press ⌘ Space, type `Terminal`, press Enter).
-2. If you don't have Homebrew yet, install it: copy the one line from [brew.sh](https://brew.sh),
-   paste it into Terminal, press Enter, and follow what it says.
+2. If you don't have [Homebrew](https://brew.sh) yet, paste this line, press Enter, and follow what
+   it says (it asks for your Mac password and takes a few minutes the first time):
+
+   ```sh
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+
 3. Paste these three lines and press Enter:
 
    ```sh
