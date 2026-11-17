@@ -6,13 +6,19 @@
 #
 # Usage:
 #   site-vendor --base-url https://example.com --out DIR \
-#               --path a/b.js [--path ...] [--optional c/d.ini ...]
+#               --path a/b.js [--path ...] [--optional c/d.ini ...] \
+#               [--sha256 a/b.js=<hex> ...] [--max-time SECONDS]
 #
 #   --path      Required file (site-relative). Any failure aborts loudly.
 #   --optional  Best-effort file: a 404 is skipped (some games probe for
 #               files their own server no longer has).
+#   --sha256    Pin a file to its sha256: a download with other bytes is
+#               deleted and the install fails (for a pinned upstream release
+#               asset that could be re-uploaded under the same name).
+#   --max-time  Seconds one download may take (default 120; a 90 MB swf
+#               needs more on a slow link).
 #
-# Every download is bounded (--connect-timeout 5, --max-time 120, 2 retries)
+# Every download is bounded (--connect-timeout 5, --max-time, 2 retries)
 # and lands atomically (tmp file + mv). Exits nonzero with the offending URL
 # on any required failure — cask preflight_steps surface that as "install needs
 # network once".
@@ -21,14 +27,16 @@ set -euo pipefail
 log() { printf 'site-vendor: %s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
-base_url="" out=""
-required=() optional=()
+base_url="" out="" max_time=120
+required=() optional=() pins=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --base-url) base_url=${2:?--base-url needs a value}; shift 2 ;;
     --out)      out=${2:?--out needs a value}; shift 2 ;;
     --path)     required+=("${2:?--path needs a value}"); shift 2 ;;
     --optional) optional+=("${2:?--optional needs a value}"); shift 2 ;;
+    --sha256)   pins+=("${2:?--sha256 needs PATH=HEX}"); shift 2 ;;
+    --max-time) max_time=${2:?--max-time needs seconds}; shift 2 ;;
     -h|--help)  awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,""); print}' "$0"; exit 0 ;;
     *)          die "unknown argument: $1" ;;
   esac
@@ -36,6 +44,12 @@ done
 [ -n "$base_url" ] || die "--base-url is required"
 [ -n "$out" ]      || die "--out is required"
 [ ${#required[@]} -gt 0 ] || die "at least one --path is required"
+case "$max_time" in ''|*[!0-9]*) die "--max-time must be whole seconds: $max_time" ;; esac
+for pin in ${pins[@]+"${pins[@]}"}; do
+  case "$pin" in *=*) ;; *) die "--sha256 needs PATH=HEX: $pin" ;; esac
+  hex=${pin#*=}
+  [[ "$hex" =~ ^[0-9a-f]{64}$ ]] || die "--sha256 hex is not 64 lowercase hex digits: $pin"
+done
 base_url=${base_url%/}
 
 fetch() { # $1=relpath  $2=required|optional
@@ -47,7 +61,7 @@ fetch() { # $1=relpath  $2=required|optional
   dest="$out/$rel"
   mkdir -p "$(dirname "$dest")"
   tmp="$dest.part"
-  code=$(curl -sL --connect-timeout 5 --max-time 120 --retry 2 \
+  code=$(curl -sL --connect-timeout 5 --max-time "$max_time" --retry 2 \
               -o "$tmp" -w '%{http_code}' "$url") || code=000
   if [ "$code" != "200" ]; then
     rm -f "$tmp"
@@ -58,6 +72,14 @@ fetch() { # $1=relpath  $2=required|optional
     die "download failed | url='$url' http_code='$code' hint='installing this game needs network access once'"
   fi
   [ -s "$tmp" ] || { rm -f "$tmp"; die "empty download | url='$url'"; }
+  local pin want got
+  for pin in ${pins[@]+"${pins[@]}"}; do
+    [ "${pin%%=*}" = "$rel" ] || continue
+    want=${pin#*=}
+    got=$(shasum -a 256 "$tmp" | awk '{print $1}')
+    [ "$got" = "$want" ] || { rm -f "$tmp"; die "sha256 mismatch | url='$url' want='$want' got='$got'"; }
+    log "sha256 ok | path='$rel'"
+  done
   mv "$tmp" "$dest"
   log "fetched $rel ($(wc -c < "$dest" | tr -d ' ') bytes)"
 }

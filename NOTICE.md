@@ -33,7 +33,8 @@ hosts none of their bits.
 | wip-slime-volleyball | mmkal/slimejs build | MIT (LICENSE vendored) |
 | bubble-trouble, get-on-top (Flash swfs) | early-2000s freeware web games, unmodified | abandonware/freeware distributed free by their authors; no license text survives |
 
-**Fetch-at-install games** (e.g. `super-slime-soccer`): for games that are
+**Fetch-at-install games** (`super-slime-soccer`; `ultimate-motherload`, jeremiah855's
+Motherload mod, fetched from the author's GitHub release and pinned by sha256): for games that are
 actively maintained and carry no redistribution license, this repository
 hosts NONE of the game's files. The cask downloads them from the game's
 official site onto the installing machine at install time — the same way
